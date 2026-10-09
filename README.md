@@ -23,17 +23,24 @@ Decision + Monitoring Layer
 Scanner / Reports / Alerts / API / Partner Infrastructure
 ```
 
-## v0.1 scope
+## Current build — v0.2
 
-- canonical market schema
-- protocol adapter contract
-- Aave Adapter #001
-- deterministic Risk Engine
-- fail-closed VERIFY data-quality gate
-- protocol-neutral yield/fee simulator
-- read-only Decision Engine
-- tests and CI
-- explicit Legal Classification Gate
+v0.2 connects the core to the official Aave v3 GraphQL API and adds evidence-based data-quality gates.
+
+Included:
+
+- live Aave market/reserve ingestion
+- supply APY and liquidity normalization
+- APY history support
+- pause/freeze status
+- oracle-address metadata
+- stablecoin USD-deviation signal
+- freshness and confidence metadata
+- live smoke test
+- 100-observation cross-chain validation collector
+
+Unknown independent risk signals are never replaced with optimistic defaults.
+Missing borrow concentration, oracle-quality, smart-contract-risk, or chain-risk inputs keep the Risk Engine at **VERIFY**.
 
 ## Multi roadmap
 
@@ -44,7 +51,7 @@ Output: scanner / monitoring / reports / API / partner vault infrastructure
 
 ## Safety and legal boundary
 
-v0.1 is **read-only research infrastructure**.
+The current product is **read-only research infrastructure**.
 
 It does not:
 
@@ -66,6 +73,10 @@ npm install
 npm run check
 npm test
 npm run build
+npm run live:aave-smoke
+npm run validate:aave-100
 ```
+
+The last two commands use live public Aave data and require network access.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
