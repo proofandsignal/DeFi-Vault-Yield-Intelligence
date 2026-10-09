@@ -93,8 +93,12 @@ export function findOracleProfile(
 }
 
 /**
- * Transparent metadata score. It does not claim that the feed is live;
- * latestRoundData staleness monitoring is a separate future signal.
+ * Independent reference-oracle metadata score.
+ *
+ * This is deliberately not a claim that Aave's configured oracle address is
+ * identical to the reference Chainlink proxy. Aave may route through adapters,
+ * CAPO, or SVR infrastructure. v0.2.1 uses the external feed as independent
+ * evidence and keeps the configured Aave oracle address separately.
  */
 export function oracleMetadataEvidence(
   profile: OracleProfile
@@ -115,12 +119,12 @@ export function oracleMetadataEvidence(
     reviewedAt: profile.reviewedAt,
     confidence: "MEDIUM",
     methodology:
-      "Chainlink market-risk category plus feed type, deviation threshold, and heartbeat metadata. Does not substitute for latestRoundData staleness monitoring.",
+      "Independent reference-oracle evidence using Chainlink market-risk category plus feed type, deviation threshold, and heartbeat metadata. It does not assert that Aave directly uses this proxy and does not replace latestRoundData staleness monitoring.",
     value: clamp(score),
     details: {
       provider: profile.provider,
       feedType: profile.feedType,
-      feedAddress: profile.feedAddress,
+      referenceFeedAddress: profile.feedAddress,
       heartbeatSeconds: profile.heartbeatSeconds,
       deviationBps: profile.deviationBps,
       marketRisk: profile.marketRisk,
