@@ -18,50 +18,65 @@
 - live supply APY, supplied USD, borrowed USD and available liquidity
 - reserve pause/freeze state
 - oracle address capture
-- stablecoin USD-deviation signal
 - explicit fetch freshness and confidence metadata
-- APY history query support
+- APY history support
 - live Ethereum/USDC smoke test
 - 100 unique live reserve observations
 - validation evidence artifact
 
-## v0.2.1 — Independent Risk Enrichment
-
-Build gate:
+## v0.2.1 — Independent Risk Enrichment ✅
 
 - DefiLlama independent stablecoin price cross-check
-- reviewed oracle type / heartbeat / deviation reference metadata
-- reviewed protocol and smart-contract security evidence
+- reviewed oracle reference metadata
+- reviewed protocol/security evidence
 - reviewed chain-risk evidence
 - explicit borrower-concentration provider boundary
 - weighted evidence coverage
 - critical-risk evidence gates
 - live Ethereum USDC enriched risk decision
 
-Integrity rule:
+Validated live result on 2026-10-09:
 
-- no missing risk dimension is silently converted to zero
-- borrower concentration may remain unresolved but must remain visible
-- no GREEN/WATCH/RED decision below 80% weighted coverage
-- no decision when stablecoin, oracle, smart-contract, or chain evidence is missing
-- heuristics are versioned and explicitly documented as uncalibrated
-
-## v0.2.2 — Calibration / Concentration
-
-- reserve-wide borrower concentration source
-- onchain oracle latestRoundData freshness
-- Aave adapter/CAPO/SVR topology resolution
-- historical incident / stress-period calibration
-- threshold calibration against observed distributions
+- status: WATCH
+- score: 43.68
+- weighted evidence coverage: 88%
+- confidence: MEDIUM
+- unresolved: borrower concentration only
 
 ## v0.3 — Multi-Protocol Validation
 
-- Morpho adapter
-- Compound adapter
-- Spark adapter
+Build gate:
+
+- Morpho Blue adapter
+- Compound III adapter
+- SparkLend adapter
+- Aave Adapter #001 retained
 - canonical-schema compatibility tests
-- cross-protocol comparison
-- risk-adjusted net yield ranking
+- protocol-specific normalization tests
+- shared rate-normalization utilities
+- live Ethereum USDC comparison across all four protocols
+- common independent risk enrichment
+- provisional risk-adjusted yield ranking
+- all four observations must satisfy >=80% evidence coverage
+- no protocol may remain VERIFY because of an adapter/schema defect
+
+Integrity rules:
+
+- no separate Risk Engine per protocol
+- no vault product is disguised as a lending market
+- Morpho v0.3 targets Blue markets, not Vault V2
+- protocol-specific oracle evidence may be supplied by an adapter when semantics differ
+- ranking is explicitly provisional and uncalibrated
+
+## v0.3.1 — Calibration / Concentration
+
+- reserve-wide borrower concentration sources
+- onchain oracle freshness / latestRoundData where applicable
+- richer oracle topology resolution
+- historical incident / stress-period calibration
+- threshold calibration against observed distributions
+- protocol-security registry review and calibration
+- incentive APY normalization
 
 ## v0.4 — Monitoring Product
 
