@@ -43,7 +43,7 @@ const DEPLOYMENTS: Deployment[] = [
     protocolDataProvider: "0xFc21d6d146E6086B8359705C8b28512a983db0cb",
     oracle: "0x8105f69D9C41644c6A0803fDA7D03Aa70996cFD9",
     assets: {
-      USDC: "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+      USDC: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
     }
   }
 ];
