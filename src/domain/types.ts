@@ -1,10 +1,25 @@
 export type RiskStatus = "GREEN" | "WATCH" | "RED" | "VERIFY";
 export type ProtocolStatus = "operational" | "degraded" | "paused" | "unknown";
+export type DataFreshness = "FRESH" | "STALE" | "UNKNOWN";
+export type DataConfidence = "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN";
+
+export interface DataQuality {
+  source: string;
+  fetchedAt: string;
+  evaluatedAt: string;
+  ageSeconds: number;
+  freshness: DataFreshness;
+  confidence: DataConfidence;
+  sourceTimestampKnown: boolean;
+  missingCriticalFields: string[];
+  warnings: string[];
+}
 
 export interface AssetRef {
   symbol: string;
   address: string;
   decimals: number;
+  isStablecoin: boolean | null;
 }
 
 export interface MarketSnapshot {
@@ -23,6 +38,7 @@ export interface MarketSnapshot {
   borrowConcentrationPct: number | null;
 
   stablecoinDepegBps: number | null;
+  oracleAddress: string | null;
   oracleRiskScore: number | null;
   smartContractRiskScore: number | null;
   chainRiskScore: number | null;
@@ -30,6 +46,7 @@ export interface MarketSnapshot {
 
   observedAt: string;
   source: string;
+  dataQuality: DataQuality;
 }
 
 export interface RiskBreakdown {
