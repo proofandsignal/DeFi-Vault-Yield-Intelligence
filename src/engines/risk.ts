@@ -108,9 +108,12 @@ export function assessRisk(snapshot: MarketSnapshot): RiskAssessment {
   if (snapshot.protocolStatus === "degraded") reasons.push("Protocol status is degraded.");
   if (snapshot.protocolStatus === "paused") reasons.push("Protocol is paused.");
 
+  const status =
+    snapshot.protocolStatus === "paused" ? "RED" : statusFromScore(score);
+
   return {
     score: Math.round(score * 100) / 100,
-    status: statusFromScore(score),
+    status,
     breakdown,
     reasons,
     missingFields: []
