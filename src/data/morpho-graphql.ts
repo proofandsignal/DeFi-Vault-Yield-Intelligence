@@ -25,6 +25,11 @@ interface GraphQLResponse<T> {
   errors?: Array<{ message?: string }>;
 }
 
+interface MorphoWarning {
+  type: string;
+  level: "YELLOW" | "RED" | string;
+}
+
 interface MorphoGraphQLMarket {
   marketId: string;
   listed: boolean;
@@ -39,7 +44,9 @@ interface MorphoGraphQLMarket {
   };
   oracle: null | {
     address: string;
+    type?: string | null;
   };
+  warnings?: MorphoWarning[];
   state: null | {
     supplyAssetsUsd: number | string | null;
     borrowAssetsUsd: number | string | null;
@@ -67,6 +74,34 @@ const finite = (
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
+
+function oracleRiskScore(
+  oracle: MorphoGraphQLMarket["oracle"],
+  warnings: MorphoWarning[] = []
+): number | null {
+  if (!oracle?.address) return null;
+
+  const oracleUnusable = warnings.some(
+    (warning) =>
+      warning.level === "RED" &&
+      warning.type.toLowerCase() === "oracle_unusable"
+  );
+  if (oracleUnusable) return 100;
+
+  const priceDerivation = warnings.some(
+    (warning) =>
+      warning.level === "RED" &&
+      warning.type.toLowerCase() === "oracle_price_derivation"
+  );
+  if (priceDerivation) return 90;
+
+  const type = oracle.type?.toLowerCase() ?? "";
+  if (type.includes("chainlink")) return 30;
+
+  // A custom/unknown oracle is not treated as broken, but receives a
+  // conservative score until its composition is independently classified.
+  return 55;
+}
 
 export class MorphoGraphQLDataSource implements MorphoDataSource {
   constructor(
@@ -132,6 +167,11 @@ export class MorphoGraphQLDataSource implements MorphoDataSource {
             }
             oracle {
               address
+              type
+            }
+            warnings {
+              type
+              level
             }
             state {
               supplyAssetsUsd
@@ -193,6 +233,10 @@ export class MorphoGraphQLDataSource implements MorphoDataSource {
         availableLiquidityUsd,
         borrowConcentrationPct: null,
         oracleAddress,
+        oracleRiskScore: oracleRiskScore(
+          market.oracle,
+          market.warnings ?? []
+        ),
         protocolStatus: market.listed ? "operational" : "unknown",
         observedAt: fetchedAt,
         source: this.endpoint,
