@@ -9,38 +9,44 @@ The project does **not** build a lending protocol. It builds a protocol-neutral 
 **Everything is multi by architecture.** Aave is Adapter #001, not the product boundary.
 
 ```text
-Data Sources
-    |
-Protocol Adapters
+Protocol Data
     |
 Canonical Market Schema
     |
-    +--> Risk Engine ------> GREEN / WATCH / RED / VERIFY
-    +--> Yield Engine -----> Gross / Fees / Costs / Net Yield
+Independent Risk Evidence
     |
-Decision + Monitoring Layer
+Risk Engine ------> GREEN / WATCH / RED / VERIFY
+    |
+Yield Engine -----> Gross / Fees / Costs / Net Yield
     |
 Scanner / Reports / Alerts / API / Partner Infrastructure
 ```
 
-## Current build — v0.2
+## Current build — v0.2.1
 
-v0.2 connects the core to the official Aave v3 GraphQL API and adds evidence-based data-quality gates.
+v0.2.1 adds independent risk enrichment above the live-data foundation.
 
 Included:
 
-- live Aave market/reserve ingestion
-- supply APY and liquidity normalization
-- APY history support
-- pause/freeze status
-- oracle-address metadata
-- stablecoin USD-deviation signal
-- freshness and confidence metadata
-- live smoke test
-- 100-observation cross-chain validation collector
+- live Aave V3 market data
+- DefiLlama independent stablecoin-price cross-check
+- reviewed oracle reference metadata
+- reviewed protocol/security evidence
+- reviewed chain architecture evidence
+- explicit borrower-concentration provider boundary
+- weighted evidence coverage
+- critical-evidence gates
+- live independent Ethereum/USDC risk smoke test
 
-Unknown independent risk signals are never replaced with optimistic defaults.
-Missing borrow concentration, oracle-quality, smart-contract-risk, or chain-risk inputs keep the Risk Engine at **VERIFY**.
+A risk decision requires at least **80% weighted evidence coverage** and no unresolved critical dimension.
+
+Missing borrower concentration is not converted to zero. It remains visible and reduces confidence/coverage.
+
+## Evidence boundary
+
+Reference oracle metadata does not imply that Aave directly uses the same Chainlink proxy. Aave may use adapters, CAPO, SVR, or other routing.
+
+The methodology and current limitations are documented in [docs/RISK_METHODOLOGY.md](docs/RISK_METHODOLOGY.md).
 
 ## Multi roadmap
 
@@ -75,8 +81,9 @@ npm test
 npm run build
 npm run live:aave-smoke
 npm run validate:aave-100
+npm run live:risk-smoke
 ```
 
-The last two commands use live public Aave data and require network access.
+Live commands require network access.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/RISK_METHODOLOGY.md](docs/RISK_METHODOLOGY.md), and [docs/ROADMAP.md](docs/ROADMAP.md).
