@@ -62,6 +62,8 @@ export class IndependentRiskEnricher {
     if (oracleProfile) {
       const oracleEvidence = oracleMetadataEvidence(oracleProfile);
       snapshot.oracleRiskScore = oracleEvidence.value;
+      oracleEvidence.details.aaveConfiguredOracleAddress =
+        snapshot.oracleAddress;
       evidence.push(oracleEvidence);
     } else {
       snapshot.oracleRiskScore = null;
