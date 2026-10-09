@@ -41,6 +41,7 @@ test("Morpho adapter emits canonical MarketSnapshot", async () => {
         availableLiquidityUsd: 30,
         borrowConcentrationPct: null,
         oracleAddress: "0xoracle",
+        oracleRiskScore: 30,
         protocolStatus: "operational",
         observedAt: quality.fetchedAt,
         source: quality.source,
@@ -58,6 +59,7 @@ test("Morpho adapter emits canonical MarketSnapshot", async () => {
   assert.equal(snapshot.grossApyPct, 4.2);
   assert.equal(snapshot.suppliedUsd, 100);
   assert.equal(snapshot.asset.symbol, "USDC");
+  assert.equal(snapshot.oracleRiskScore, 30);
 });
 
 test("Compound adapter emits the same canonical MarketSnapshot shape", async () => {
