@@ -1,4 +1,5 @@
 export type RiskStatus = "GREEN" | "WATCH" | "RED" | "VERIFY";
+export type RiskConfidence = "HIGH" | "MEDIUM" | "LOW";
 export type ProtocolStatus = "operational" | "degraded" | "paused" | "unknown";
 export type DataFreshness = "FRESH" | "STALE" | "UNKNOWN";
 export type DataConfidence = "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN";
@@ -63,6 +64,8 @@ export interface RiskBreakdown {
 export interface RiskAssessment {
   score: number | null;
   status: RiskStatus;
+  confidence: RiskConfidence;
+  coveragePct: number;
   breakdown: RiskBreakdown;
   reasons: string[];
   missingFields: string[];
