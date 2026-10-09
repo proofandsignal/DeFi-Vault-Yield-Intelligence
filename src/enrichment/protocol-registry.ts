@@ -23,6 +23,39 @@ const PROFILES: ProtocolSecurityProfile[] = [
     activeCriticalIncident: false,
     source: "https://www.aave.com/security",
     reviewedAt: "2026-10-09"
+  },
+  {
+    protocol: "morpho",
+    yearsContinuousOperation: 2,
+    publishedAuditsAndReviews: 4,
+    maxLiveBugBountyUsd: 2_500_000,
+    onchainGovernance: false,
+    mandatoryTimelock: false,
+    activeCriticalIncident: false,
+    source: "https://docs.morpho.org/learn/resources/risks/",
+    reviewedAt: "2026-10-09"
+  },
+  {
+    protocol: "compound",
+    yearsContinuousOperation: 4,
+    publishedAuditsAndReviews: 2,
+    maxLiveBugBountyUsd: 1_000_000,
+    onchainGovernance: true,
+    mandatoryTimelock: true,
+    activeCriticalIncident: false,
+    source: "https://docs.compound.finance/",
+    reviewedAt: "2026-10-09"
+  },
+  {
+    protocol: "spark",
+    yearsContinuousOperation: 3,
+    publishedAuditsAndReviews: 2,
+    maxLiveBugBountyUsd: 5_000_000,
+    onchainGovernance: true,
+    mandatoryTimelock: false,
+    activeCriticalIncident: false,
+    source: "https://spark.fi/",
+    reviewedAt: "2026-10-09"
   }
 ];
 
@@ -31,7 +64,10 @@ function clamp(value: number): number {
 }
 
 /**
- * v0.2.1 transparent heuristic, intentionally simple and recalibratable.
+ * Transparent security-posture heuristic, intentionally simple and
+ * recalibratable. Audit counts are conservative verified lower bounds rather
+ * than claims that every review covers the exact live market configuration.
+ *
  * Lower score = lower observed smart-contract/protocol security risk.
  */
 export function protocolSecurityEvidence(
@@ -56,7 +92,7 @@ export function protocolSecurityEvidence(
     reviewedAt: profile.reviewedAt,
     confidence: "MEDIUM",
     methodology:
-      "Deterministic security-posture heuristic using operating history, published reviews, bug-bounty coverage, governance, timelock, and active-incident flag.",
+      "Deterministic security-posture heuristic using operating history, conservative verified review count, bug-bounty coverage, governance, timelock, and active-incident flag. This score is explicitly uncalibrated.",
     value: clamp(score),
     details: {
       yearsContinuousOperation: profile.yearsContinuousOperation,

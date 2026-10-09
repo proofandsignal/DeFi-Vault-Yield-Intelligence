@@ -55,19 +55,35 @@ export class IndependentRiskEnricher {
       }
     }
 
-    const oracleProfile = findOracleProfile(
-      snapshot.chainId,
-      snapshot.asset.symbol
-    );
-    if (oracleProfile) {
-      const oracleEvidence = oracleMetadataEvidence(oracleProfile);
-      snapshot.oracleRiskScore = oracleEvidence.value;
-      oracleEvidence.details.aaveConfiguredOracleAddress =
-        snapshot.oracleAddress;
-      evidence.push(oracleEvidence);
+    if (snapshot.oracleRiskScore !== null) {
+      evidence.push({
+        dimension: "oracle",
+        source: snapshot.source,
+        reviewedAt: snapshot.observedAt,
+        confidence: "MEDIUM",
+        methodology:
+          "Protocol-specific oracle evidence supplied by the protocol adapter from live oracle type/status or warning signals.",
+        value: snapshot.oracleRiskScore,
+        details: {
+          configuredOracleAddress: snapshot.oracleAddress,
+          protocol: snapshot.protocol
+        }
+      });
     } else {
-      snapshot.oracleRiskScore = null;
-      unresolved.add("oracle");
+      const oracleProfile = findOracleProfile(
+        snapshot.chainId,
+        snapshot.asset.symbol
+      );
+      if (oracleProfile) {
+        const oracleEvidence = oracleMetadataEvidence(oracleProfile);
+        snapshot.oracleRiskScore = oracleEvidence.value;
+        oracleEvidence.details.configuredOracleAddress =
+          snapshot.oracleAddress;
+        evidence.push(oracleEvidence);
+      } else {
+        snapshot.oracleRiskScore = null;
+        unresolved.add("oracle");
+      }
     }
 
     const protocolEvidence = protocolSecurityEvidence(snapshot.protocol);
