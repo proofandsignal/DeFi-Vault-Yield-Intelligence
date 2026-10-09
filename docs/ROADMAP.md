@@ -1,6 +1,6 @@
 # Roadmap
 
-## v0.1 — Core Multi Architecture
+## v0.1 — Core Multi Architecture ✅
 
 - canonical multi-protocol market schema
 - protocol adapter interface
@@ -12,15 +12,37 @@
 - unit tests and CI
 - legal lock documented
 
-## v0.2 — Live Data + Risk Calibration
+## v0.2 — Live Aave Data + Data Quality
 
-- live Aave market data source
-- APY and liquidity history
-- source freshness and confidence fields
-- stablecoin/depeg monitor
-- oracle and protocol-status inputs
-- 100-observation validation dataset
-- risk thresholds calibrated against observed conditions
+Build gate:
+
+- official Aave v3 GraphQL market data source
+- live supply APY, supplied USD, borrowed USD and available liquidity
+- reserve pause/freeze state
+- oracle address capture
+- stablecoin depeg signal from Aave USD exchange rate
+- explicit fetch freshness and confidence metadata
+- APY history query support
+- live Ethereum/USDC smoke test
+- 100 unique live reserve observations across supported chains
+- validation evidence uploaded as a CI artifact
+
+Risk integrity rule:
+
+Aave market data does **not** automatically provide independent borrow-concentration,
+oracle-quality, smart-contract-risk, or chain-risk scores. Those values remain null and
+the Decision Engine stays **VERIFY** until independent enrichment models are connected.
+
+## v0.2.1 — Risk Enrichment / Calibration
+
+Only after the live 100-observation gate:
+
+- independent stablecoin price cross-check
+- oracle type / heartbeat / deviation analysis
+- protocol and smart-contract risk registry
+- chain / bridge risk inputs
+- borrower concentration input
+- calibrate risk thresholds against observed distributions
 
 ## v0.3 — Multi-Protocol Validation
 
