@@ -52,13 +52,24 @@ export class DefiLlamaPriceSource implements IndependentPriceSource {
     }
 
     const payload = (await response.json()) as LlamaResponse;
-    const coin = payload.coins?.[key];
-    if (!coin || !Number.isFinite(coin.price)) return null;
+    const coins = payload.coins ?? {};
+    const exact = coins[key];
+    const normalized =
+      exact ??
+      Object.entries(coins).find(
+        ([coinKey]) => coinKey.toLowerCase() === key.toLowerCase()
+      )?.[1];
+
+    if (!normalized || !Number.isFinite(normalized.price)) return null;
 
     return {
-      priceUsd: coin.price!,
-      timestamp: Number.isFinite(coin.timestamp) ? coin.timestamp! : null,
-      confidence: Number.isFinite(coin.confidence) ? coin.confidence! : null,
+      priceUsd: normalized.price!,
+      timestamp: Number.isFinite(normalized.timestamp)
+        ? normalized.timestamp!
+        : null,
+      confidence: Number.isFinite(normalized.confidence)
+        ? normalized.confidence!
+        : null,
       source: `${this.baseUrl}/prices/current/${key}`
     };
   }
