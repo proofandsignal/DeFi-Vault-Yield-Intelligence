@@ -1,6 +1,6 @@
 {
   "name": "defi-vault-yield-intelligence",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "Multi-protocol, multi-chain, multi-asset DeFi risk and yield intelligence core.",
   "type": "module",
@@ -10,7 +10,11 @@
     "test": "tsx --test tests/*.test.ts",
     "live:aave-smoke": "tsx scripts/live-aave-smoke.ts",
     "validate:aave-100": "tsx scripts/collect-aave-validation.ts",
-    "live:risk-smoke": "tsx scripts/live-risk-enrichment-smoke.ts"
+    "live:risk-smoke": "tsx scripts/live-risk-enrichment-smoke.ts",
+    "live:multi-protocol": "tsx scripts/live-multi-protocol-smoke.ts"
+  },
+  "dependencies": {
+    "ethers": "^6.17.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
