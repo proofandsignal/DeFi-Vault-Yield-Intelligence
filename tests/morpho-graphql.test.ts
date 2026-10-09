@@ -62,7 +62,7 @@ test("normalizes Morpho Blue market into protocol-neutral record", async () => {
 });
 
 test("RED oracle_unusable warning hardens Morpho oracle risk", async () => {
-  const warningPayload = structuredClone(payload);
+  const warningPayload: any = structuredClone(payload);
   warningPayload.data.markets.items[0]!.warnings = [
     { type: "oracle_unusable", level: "RED" }
   ];
