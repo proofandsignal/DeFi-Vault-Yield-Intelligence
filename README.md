@@ -9,48 +9,61 @@ The project does **not** build a lending protocol. It builds a protocol-neutral 
 **Everything is multi by architecture.** Aave is Adapter #001, not the product boundary.
 
 ```text
-Protocol Data
-    |
-Canonical Market Schema
-    |
-Independent Risk Evidence
-    |
+Aave / Morpho / Compound / Spark
+              |
+        Protocol Adapters
+              |
+     Canonical Market Schema
+              |
+     Independent Risk Evidence
+              |
 Risk Engine ------> GREEN / WATCH / RED / VERIFY
-    |
+              |
 Yield Engine -----> Gross / Fees / Costs / Net Yield
-    |
+              |
 Scanner / Reports / Alerts / API / Partner Infrastructure
 ```
 
-## Current build — v0.2.1
+## Current build — v0.3
 
-v0.2.1 adds independent risk enrichment above the live-data foundation.
+v0.3 validates the canonical core across four different lending designs.
 
-Included:
+Adapters:
 
-- live Aave V3 market data
-- DefiLlama independent stablecoin-price cross-check
-- reviewed oracle reference metadata
-- reviewed protocol/security evidence
-- reviewed chain architecture evidence
-- explicit borrower-concentration provider boundary
-- weighted evidence coverage
-- critical-evidence gates
-- live independent Ethereum/USDC risk smoke test
+- **Aave V3** — official GraphQL reserve data
+- **Morpho Blue** — official GraphQL isolated lending markets
+- **Compound III** — onchain Comet base-asset markets
+- **SparkLend** — onchain reserve data through its canonical protocol data provider
 
-A risk decision requires at least **80% weighted evidence coverage** and no unresolved critical dimension.
+All four normalize into the same `MarketSnapshot` and use the same Risk, Yield, and Decision engines.
 
-Missing borrower concentration is not converted to zero. It remains visible and reduces confidence/coverage.
+The live v0.3 gate compares Ethereum USDC markets and requires:
+
+- canonical APY / supply / borrow / liquidity fields
+- fresh data
+- common independent risk enrichment
+- no unresolved critical risk dimension
+- at least 80% weighted evidence coverage
+
+The provisional cross-protocol comparison uses:
+
+```text
+riskAdjustedYield = grossSupplyAPY * (1 - riskScore / 100)
+```
+
+This is an engineering validation metric, **not** a calibrated investment model or investment recommendation.
 
 ## Evidence boundary
 
-Reference oracle metadata does not imply that Aave directly uses the same Chainlink proxy. Aave may use adapters, CAPO, SVR, or other routing.
+Missing risk dimensions are never silently converted to zero.
 
-The methodology and current limitations are documented in [docs/RISK_METHODOLOGY.md](docs/RISK_METHODOLOGY.md).
+Borrow concentration may remain unresolved and is exposed in the result. Oracle evidence is protocol-aware: for example, Morpho Blue's collateral/loan-asset oracle is not replaced by a generic USDC/USD reference feed.
+
+See [docs/RISK_METHODOLOGY.md](docs/RISK_METHODOLOGY.md) and [docs/MULTI_PROTOCOL.md](docs/MULTI_PROTOCOL.md).
 
 ## Multi roadmap
 
-Protocol: Aave -> Morpho -> Compound -> Spark -> future adapters  
+Protocol: Aave → Morpho → Compound → Spark → future adapters  
 Chain: Ethereum / Base / Arbitrum / Optimism / future chains  
 Asset: USDC / USDT / USDS / DAI / WETH / future assets  
 Output: scanner / monitoring / reports / API / partner vault infrastructure
@@ -82,8 +95,9 @@ npm run build
 npm run live:aave-smoke
 npm run validate:aave-100
 npm run live:risk-smoke
+npm run live:multi-protocol
 ```
 
 Live commands require network access.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/RISK_METHODOLOGY.md](docs/RISK_METHODOLOGY.md), and [docs/ROADMAP.md](docs/ROADMAP.md).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/RISK_METHODOLOGY.md](docs/RISK_METHODOLOGY.md), [docs/MULTI_PROTOCOL.md](docs/MULTI_PROTOCOL.md), and [docs/ROADMAP.md](docs/ROADMAP.md).
