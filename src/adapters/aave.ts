@@ -1,13 +1,19 @@
-import type { MarketSnapshot, ProtocolStatus } from "../domain/types.js";
+import type {
+  DataQuality,
+  MarketSnapshot,
+  ProtocolStatus
+} from "../domain/types.js";
 import type { MarketQuery, ProtocolAdapter } from "./protocol.js";
 
 export interface AaveMarketRecord {
   chainId: number;
   chain: string;
+  marketAddress: string;
   reserveId: string;
   assetSymbol: string;
   assetAddress: string;
   assetDecimals: number;
+  isStablecoin: boolean | null;
   supplyApyPct: number | null;
   rewardsApyPct: number | null;
   suppliedUsd: number | null;
@@ -15,12 +21,14 @@ export interface AaveMarketRecord {
   availableLiquidityUsd: number | null;
   borrowConcentrationPct: number | null;
   stablecoinDepegBps: number | null;
+  oracleAddress: string | null;
   oracleRiskScore: number | null;
   smartContractRiskScore: number | null;
   chainRiskScore: number | null;
   protocolStatus: ProtocolStatus;
   observedAt: string;
   source: string;
+  dataQuality: DataQuality;
 }
 
 export interface AaveDataSource {
@@ -30,8 +38,8 @@ export interface AaveDataSource {
 /**
  * Adapter #001.
  *
- * The adapter is deliberately thin: Aave-specific retrieval belongs in the
- * data source while every downstream engine consumes MarketSnapshot only.
+ * Aave-specific retrieval belongs in the data source while every downstream
+ * engine consumes the protocol-neutral MarketSnapshot shape only.
  */
 export class AaveAdapter implements ProtocolAdapter {
   readonly protocol = "aave";
@@ -49,7 +57,8 @@ export class AaveAdapter implements ProtocolAdapter {
       asset: {
         symbol: raw.assetSymbol,
         address: raw.assetAddress,
-        decimals: raw.assetDecimals
+        decimals: raw.assetDecimals,
+        isStablecoin: raw.isStablecoin
       },
       grossApyPct: raw.supplyApyPct,
       rewardsApyPct: raw.rewardsApyPct,
@@ -58,12 +67,14 @@ export class AaveAdapter implements ProtocolAdapter {
       availableLiquidityUsd: raw.availableLiquidityUsd,
       borrowConcentrationPct: raw.borrowConcentrationPct,
       stablecoinDepegBps: raw.stablecoinDepegBps,
+      oracleAddress: raw.oracleAddress,
       oracleRiskScore: raw.oracleRiskScore,
       smartContractRiskScore: raw.smartContractRiskScore,
       chainRiskScore: raw.chainRiskScore,
       protocolStatus: raw.protocolStatus,
       observedAt: raw.observedAt,
-      source: raw.source
+      source: raw.source,
+      dataQuality: raw.dataQuality
     };
   }
 }
