@@ -16,6 +16,7 @@ export interface MorphoMarketRecord {
   availableLiquidityUsd: number | null;
   borrowConcentrationPct: number | null;
   oracleAddress: string | null;
+  oracleRiskScore: number | null;
   protocolStatus: ProtocolStatus;
   observedAt: string;
   source: string;
@@ -53,7 +54,7 @@ export class MorphoAdapter implements ProtocolAdapter {
       borrowConcentrationPct: raw.borrowConcentrationPct,
       stablecoinDepegBps: null,
       oracleAddress: raw.oracleAddress,
-      oracleRiskScore: null,
+      oracleRiskScore: raw.oracleRiskScore,
       smartContractRiskScore: null,
       chainRiskScore: null,
       protocolStatus: raw.protocolStatus,
