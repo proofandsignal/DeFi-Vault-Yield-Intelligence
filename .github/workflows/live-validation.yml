@@ -1,0 +1,33 @@
+name: Live Aave Validation
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  aave-live-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Live Ethereum USDC smoke test
+        run: npm run live:aave-smoke
+
+      - name: Build 100-observation validation dataset
+        run: npm run validate:aave-100
+
+      - name: Upload validation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: aave-validation-100
+          path: artifacts/
+          if-no-files-found: error
