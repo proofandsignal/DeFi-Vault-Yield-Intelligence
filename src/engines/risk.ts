@@ -97,6 +97,14 @@ export function assessRisk(snapshot: MarketSnapshot): RiskAssessment {
     .filter(([, value]) => value === null || !Number.isFinite(value))
     .map(([key]) => key);
 
+  const criticalRiskBlocks: string[] = [];
+  if (snapshot.asset.isStablecoin && breakdown.depeg === null) {
+    criticalRiskBlocks.push("depeg");
+  }
+  if (breakdown.oracle === null) criticalRiskBlocks.push("oracle");
+  if (breakdown.smartContract === null) criticalRiskBlocks.push("smartContract");
+  if (breakdown.chain === null) criticalRiskBlocks.push("chain");
+
   const availableWeight = Object.entries(breakdown).reduce(
     (total, [key, value]) =>
       value === null || !Number.isFinite(value)
@@ -147,14 +155,28 @@ export function assessRisk(snapshot: MarketSnapshot): RiskAssessment {
       breakdown,
       reasons,
       missingFields: [
-        ...new Set([...missingFields, ...dataQualityBlocks])
+        ...new Set([
+          ...missingFields,
+          ...criticalRiskBlocks,
+          ...dataQualityBlocks
+        ])
       ]
     };
   }
 
-  const unresolved = [...new Set([...missingFields, ...dataQualityBlocks])];
+  const unresolved = [
+    ...new Set([
+      ...missingFields,
+      ...criticalRiskBlocks,
+      ...dataQualityBlocks
+    ])
+  ];
 
-  if (dataQualityBlocks.length > 0 || coverage < MIN_DECISION_COVERAGE) {
+  if (
+    dataQualityBlocks.length > 0 ||
+    criticalRiskBlocks.length > 0 ||
+    coverage < MIN_DECISION_COVERAGE
+  ) {
     return {
       score: null,
       status: "VERIFY",
@@ -165,7 +187,7 @@ export function assessRisk(snapshot: MarketSnapshot): RiskAssessment {
       coveragePct,
       breakdown,
       reasons: [
-        "Risk decision blocked because evidence coverage or data quality is below the decision gate.",
+        "Risk decision blocked because critical evidence, evidence coverage, or data quality is below the decision gate.",
         ...reasons
       ],
       missingFields: unresolved
