@@ -33,9 +33,10 @@ function liquidityRisk(snapshot: MarketSnapshot): number | null {
   return clamp((1 - liquidityRatio) * 100);
 }
 
-function depegRisk(depegBps: number | null): number | null {
-  if (depegBps === null) return null;
-  return clamp(Math.abs(depegBps) / 2);
+function depegRisk(snapshot: MarketSnapshot): number | null {
+  if (snapshot.asset.isStablecoin === false) return 0;
+  if (snapshot.stablecoinDepegBps === null) return null;
+  return clamp(Math.abs(snapshot.stablecoinDepegBps) / 2);
 }
 
 function protocolRisk(status: MarketSnapshot["protocolStatus"]): number | null {
@@ -62,7 +63,7 @@ export function assessRisk(snapshot: MarketSnapshot): RiskAssessment {
     utilization: utilizationRisk(snapshot),
     liquidity: liquidityRisk(snapshot),
     concentration: snapshot.borrowConcentrationPct,
-    depeg: depegRisk(snapshot.stablecoinDepegBps),
+    depeg: depegRisk(snapshot),
     oracle: snapshot.oracleRiskScore,
     smartContract: snapshot.smartContractRiskScore,
     chain: snapshot.chainRiskScore,
@@ -84,21 +85,19 @@ export function assessRisk(snapshot: MarketSnapshot): RiskAssessment {
     .filter(([, value]) => value === null || !Number.isFinite(value))
     .map(([key]) => key);
 
-  if (missingFields.length > 0) {
-    return {
-      score: null,
-      status: "VERIFY",
-      breakdown,
-      reasons: ["Risk decision blocked because required risk inputs are missing."],
-      missingFields
-    };
+  const dataQualityBlocks: string[] = [];
+  if (snapshot.dataQuality.freshness !== "FRESH") {
+    dataQualityBlocks.push("data.freshness");
   }
-
-  const score = clamp(
-    Object.entries(breakdown).reduce((total, [key, value]) => {
-      return total + (value as number) * weights[key as keyof RiskBreakdown];
-    }, 0)
-  );
+  if (
+    snapshot.dataQuality.confidence === "LOW" ||
+    snapshot.dataQuality.confidence === "UNKNOWN"
+  ) {
+    dataQualityBlocks.push("data.confidence");
+  }
+  for (const field of snapshot.dataQuality.missingCriticalFields) {
+    dataQualityBlocks.push(`data.${field}`);
+  }
 
   const reasons: string[] = [];
   if ((breakdown.utilization ?? 0) > 80) reasons.push("High market utilization.");
@@ -108,12 +107,40 @@ export function assessRisk(snapshot: MarketSnapshot): RiskAssessment {
   if (snapshot.protocolStatus === "degraded") reasons.push("Protocol status is degraded.");
   if (snapshot.protocolStatus === "paused") reasons.push("Protocol is paused.");
 
-  const status =
-    snapshot.protocolStatus === "paused" ? "RED" : statusFromScore(score);
+  // A confirmed pause is a conservative hard RED even if other inputs are absent.
+  if (snapshot.protocolStatus === "paused") {
+    return {
+      score: null,
+      status: "RED",
+      breakdown,
+      reasons,
+      missingFields: [...new Set([...missingFields, ...dataQualityBlocks])]
+    };
+  }
+
+  const unresolved = [...new Set([...missingFields, ...dataQualityBlocks])];
+  if (unresolved.length > 0) {
+    return {
+      score: null,
+      status: "VERIFY",
+      breakdown,
+      reasons: [
+        "Risk decision blocked because required risk or data-quality inputs are unresolved.",
+        ...reasons
+      ],
+      missingFields: unresolved
+    };
+  }
+
+  const score = clamp(
+    Object.entries(breakdown).reduce((total, [key, value]) => {
+      return total + (value as number) * weights[key as keyof RiskBreakdown];
+    }, 0)
+  );
 
   return {
     score: Math.round(score * 100) / 100,
-    status,
+    status: statusFromScore(score),
     breakdown,
     reasons,
     missingFields: []
