@@ -20,8 +20,10 @@ const payload = {
             }
           },
           oracle: {
-            address: "0xoracle"
+            address: "0xoracle",
+            type: "ChainlinkOracleV2"
           },
+          warnings: [],
           state: {
             supplyAssetsUsd: 100_000_000,
             borrowAssetsUsd: 70_000_000,
@@ -56,4 +58,23 @@ test("normalizes Morpho Blue market into protocol-neutral record", async () => {
   assert.equal(record.borrowedUsd, 70_000_000);
   assert.equal(record.availableLiquidityUsd, 30_000_000);
   assert.equal(record.oracleAddress, "0xoracle");
+  assert.equal(record.oracleRiskScore, 30);
+});
+
+test("RED oracle_unusable warning hardens Morpho oracle risk", async () => {
+  const warningPayload = structuredClone(payload);
+  warningPayload.data.markets.items[0]!.warnings = [
+    { type: "oracle_unusable", level: "RED" }
+  ];
+
+  const fakeFetch: typeof fetch = async () =>
+    new Response(JSON.stringify(warningPayload), { status: 200 });
+
+  const source = new MorphoGraphQLDataSource(fakeFetch);
+  const record = await source.getMarket({
+    chainId: 1,
+    assetSymbol: "USDC"
+  });
+
+  assert.equal(record.oracleRiskScore, 100);
 });
