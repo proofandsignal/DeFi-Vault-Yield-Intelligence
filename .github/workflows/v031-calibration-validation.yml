@@ -1,0 +1,25 @@
+name: V031 Calibration Validation
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  calibration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EVM_RPC_URL: https://ethereum-rpc.publicnode.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Live v0.3.1 concentration and calibration gate
+        run: npm run live:v031
