@@ -35,7 +35,7 @@ Included:
 
 - live Aave V3, Morpho Blue, Compound III and SparkLend market data
 - reserve-wide borrower concentration for Morpho Blue
-- event-history + current-debt reconciliation for Aave V3 and SparkLend
+- complete variable-debt-token holder discovery + current onchain debt reconciliation for Aave V3 and SparkLend
 - explicit unresolved concentration for Compound III
 - >=99.5% debt-reconciliation requirement before Aave/Spark concentration is accepted
 - live oracle freshness where compatible
