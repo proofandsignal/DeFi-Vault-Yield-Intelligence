@@ -134,18 +134,75 @@ function utilizationPct(snapshot: MarketSnapshot): number | null {
   );
 }
 
+const PUBLIC_SOURCE_HOSTS = new Set([
+  "api.v3.aave.com",
+  "api.morpho.org",
+  "coins.llama.fi",
+  "data.chain.link",
+  "docs.kpk.dev",
+  "www.aave.com",
+  "aave.com",
+  "docs.morpho.org",
+  "ethereum.org",
+  "www.ethereum.org",
+  "l2beat.com",
+  "www.l2beat.com",
+  "spark.fi",
+  "www.spark.fi",
+  "eth.blockscout.com"
+]);
+
+export function sanitizeEvidenceSource(source: string): string {
+  if (!/^https?:\/\//i.test(source)) return source;
+
+  const hashIndex = source.indexOf("#");
+  const fragment =
+    hashIndex >= 0 ? source.slice(hashIndex + 1) : "";
+  const base =
+    hashIndex >= 0 ? source.slice(0, hashIndex) : source;
+
+  try {
+    const url = new URL(base);
+
+    if (PUBLIC_SOURCE_HOSTS.has(url.hostname.toLowerCase())) {
+      url.search = "";
+      url.username = "";
+      url.password = "";
+      return (
+        url.toString().replace(/\/$/, "") +
+        (fragment ? `#${fragment}` : "")
+      );
+    }
+
+    return (
+      url.origin +
+      (fragment ? `#${fragment}` : "")
+    );
+  } catch {
+    return "redacted-source";
+  }
+}
+
+function sanitizeMessage(message: string): string {
+  return message.replace(
+    /https?:\/\/[^\s)]+/gi,
+    (match) => sanitizeEvidenceSource(match)
+  );
+}
+
 function sourceError(
   protocol: SupportedProtocol,
   error: unknown
 ): ScannerError {
-  const message =
+  const rawMessage =
     error instanceof Error ? error.message : String(error);
+  const message = sanitizeMessage(rawMessage);
 
   return {
     protocol,
-    code: /unsupported|no .* found/i.test(message)
+    code: /unsupported|no .* found/i.test(rawMessage)
       ? "UNSUPPORTED_MARKET"
-      : /HTTP|GraphQL|RPC|network|fetch/i.test(message)
+      : /HTTP|GraphQL|RPC|network|fetch/i.test(rawMessage)
         ? "SOURCE_UNAVAILABLE"
         : "INTERNAL",
     message
@@ -223,9 +280,14 @@ export class YieldScannerService {
       const riskMultiplier =
         risk.score === null ? null : 1 - risk.score / 100;
 
+      const publicEvidence = enriched.evidence.map((item) => ({
+        ...item,
+        source: sanitizeEvidenceSource(item.source)
+      }));
+
       const evidenceSources = [
         ...new Set(
-          enriched.evidence
+          publicEvidence
             .map((item) => item.source)
             .filter(Boolean)
         )
@@ -274,7 +336,7 @@ export class YieldScannerService {
         evidenceCount: enriched.evidence.length,
         evidenceSources,
         evidence: query.includeEvidence
-          ? enriched.evidence
+          ? publicEvidence
           : undefined
       };
     });
