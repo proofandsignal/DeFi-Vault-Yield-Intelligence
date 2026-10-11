@@ -2,90 +2,51 @@
 
 ## v0.1 — Core Multi Architecture ✅
 
-- canonical multi-protocol market schema
-- protocol adapter interface
-- Aave Adapter #001
-- deterministic Risk Engine
-- fail-closed UNKNOWN/VERIFY data-quality behavior
-- protocol-neutral yield and fee simulator
-- non-executing Decision Engine
-- unit tests and CI
-- legal lock documented
+Canonical schema, protocol adapter interface, shared Risk/Yield/Decision engines, tests, CI and legal lock.
 
 ## v0.2 — Live Aave Data + Data Quality ✅
 
-- official Aave v3 GraphQL market data source
-- live supply APY, supplied USD, borrowed USD and available liquidity
-- reserve pause/freeze state
-- oracle address capture
-- explicit fetch freshness and confidence metadata
-- APY history support
-- live Ethereum/USDC smoke test
-- 100 unique live reserve observations
-- validation evidence artifact
+Official Aave live data, APY/liquidity normalization, data-quality metadata and 100-observation validation evidence.
 
 ## v0.2.1 — Independent Risk Enrichment ✅
 
-- DefiLlama independent stablecoin price cross-check
-- reviewed oracle reference metadata
-- reviewed protocol/security evidence
-- reviewed chain-risk evidence
-- explicit borrower-concentration provider boundary
-- weighted evidence coverage
-- critical-risk evidence gates
-- live Ethereum USDC enriched risk decision
+Independent stablecoin price evidence, oracle/protocol/chain evidence and weighted evidence coverage.
 
-Validated live result on 2026-10-09:
+## v0.3 — Multi-Protocol Validation ✅
 
-- status: WATCH
-- score: 43.68
-- weighted evidence coverage: 88%
-- confidence: MEDIUM
-- unresolved: borrower concentration only
+Aave V3, Morpho Blue, Compound III and SparkLend normalize into one `MarketSnapshot` and one shared engine.
 
-## v0.3 — Multi-Protocol Validation
+Validated with live Ethereum USDC data across all four protocols.
+
+## v0.3.1 — Calibration + Concentration
 
 Build gate:
 
-- Morpho Blue adapter
-- Compound III adapter
-- SparkLend adapter
-- Aave Adapter #001 retained
-- canonical-schema compatibility tests
-- protocol-specific normalization tests
-- shared rate-normalization utilities
-- live Ethereum USDC comparison across all four protocols
-- common independent risk enrichment
-- provisional risk-adjusted yield ranking
-- all four observations must satisfy >=80% evidence coverage
-- no protocol may remain VERIFY because of an adapter/schema defect
+- Morpho market-wide top-borrower concentration
+- Aave/Spark complete Borrow-event discovery
+- current variable-debt reconciliation
+- accept Aave/Spark concentration only at >=99.5% debt coverage
+- keep Compound concentration unresolved unless complete enumeration exists
+- live oracle freshness where supported
+- versioned risk weights and thresholds
+- historical stress anchors
+- hard stablecoin-depeg safety gate
+- CI + all prior live validation gates remain green
+- live v0.3.1 evidence report
 
-Integrity rules:
+## v0.4 — Yield Scanner / Comparison API
 
-- no separate Risk Engine per protocol
-- no vault product is disguised as a lending market
-- Morpho v0.3 targets Blue markets, not Vault V2
-- protocol-specific oracle evidence may be supplied by an adapter when semantics differ
-- ranking is explicitly provisional and uncalibrated
+After v0.3.1 passes:
 
-## v0.3.1 — Calibration / Concentration
-
-- reserve-wide borrower concentration sources
-- onchain oracle freshness / latestRoundData where applicable
-- richer oracle topology resolution
-- historical incident / stress-period calibration
-- threshold calibration against observed distributions
-- protocol-security registry review and calibration
-- incentive APY normalization
-
-## v0.4 — Monitoring Product
-
-- wallet/position read-only monitor
-- alerts
-- historical journal
-- scanner/report UI
-- API surface
+- normalized live market scanner
+- APY / liquidity / risk / confidence / evidence coverage
+- protocol and chain filters
+- evidence links / timestamps
+- history
+- comparison API
 - first paid software validation
+
+The first monetization target is the intelligence layer, not public capital management.
 
 ## Future — Vault / Strategy Layer
 
