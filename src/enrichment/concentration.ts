@@ -197,22 +197,41 @@ export class AaveLikeBorrowConcentrationProvider
     debtTokenAddress: string
   ): Promise<string[] | null> {
     const holders = new Set<string>();
-    const offset = 100;
+    const offset = 1000;
 
-    for (let page = 1; page <= 500; page += 1) {
+    for (let page = 1; page <= 100; page += 1) {
       const url =
         `${this.blockscoutBase}/api?module=token&action=getTokenHolders` +
         `&contractaddress=${debtTokenAddress}&page=${page}&offset=${offset}`;
 
-      const response = await this.fetchFn(url, {
-        headers: {
-          accept: "application/json",
-          "user-agent": "defi-vault-yield-intelligence/0.3.1"
-        }
-      });
-      if (!response.ok) {
+      let response: Response | null = null;
+
+      for (let attempt = 0; attempt < 7; attempt += 1) {
+        response = await this.fetchFn(url, {
+          headers: {
+            accept: "application/json",
+            "user-agent": "defi-vault-yield-intelligence/0.3.1"
+          }
+        });
+
+        if (response.status !== 429) break;
+
+        const retryAfter = Number(
+          response.headers.get("retry-after") ?? 0
+        );
+        const waitMs =
+          retryAfter > 0
+            ? retryAfter * 1000
+            : Math.min(30_000, 1500 * 2 ** attempt);
+
+        await new Promise((resolve) =>
+          setTimeout(resolve, waitMs)
+        );
+      }
+
+      if (!response?.ok) {
         throw new Error(
-          `Blockscout holder discovery HTTP ${response.status} for ${debtTokenAddress}.`
+          `Blockscout holder discovery HTTP ${response?.status ?? "unknown"} for ${debtTokenAddress} after bounded retry.`
         );
       }
 
