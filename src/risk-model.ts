@@ -29,7 +29,7 @@ export const RISK_MODEL_V031: RiskModelConfig = {
   },
   minDecisionCoverage: 0.8,
   greenMaxScore: 32,
-  watchMaxScore: 62,
+  watchMaxScore: 58,
   hardStablecoinDepegBps: 300,
   concentrationBands: [
     { maxTopBorrowerPct: 5, riskScore: 10 },
