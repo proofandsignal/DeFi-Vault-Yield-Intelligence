@@ -23,8 +23,8 @@ Validated with live Ethereum USDC data across all four protocols.
 Build gate:
 
 - Morpho market-wide top-borrower concentration
-- Aave/Spark complete Borrow-event discovery
-- current variable-debt reconciliation
+- Aave/Spark complete variable-debt-token holder discovery
+- current on-chain variable-debt reconciliation
 - accept Aave/Spark concentration only at >=99.5% debt coverage
 - keep Compound concentration unresolved unless complete enumeration exists
 - live oracle freshness where supported
