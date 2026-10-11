@@ -33,7 +33,7 @@ import type {
 
 interface ScannerDependencies {
   adapters?: Partial<Record<SupportedProtocol, ProtocolAdapter>>;
-  enricher?: IndependentRiskEnricher;
+  enricher?: Pick<IndependentRiskEnricher, "enrich">;
   cacheTtlMs?: number;
 }
 
@@ -157,7 +157,7 @@ export class YieldScannerService {
     SupportedProtocol,
     ProtocolAdapter
   >;
-  private readonly enricher: IndependentRiskEnricher;
+  private readonly enricher: Pick<IndependentRiskEnricher, "enrich">;
   private readonly cache: PromiseTtlCache<ScannerRow>;
 
   constructor(dependencies: ScannerDependencies = {}) {
