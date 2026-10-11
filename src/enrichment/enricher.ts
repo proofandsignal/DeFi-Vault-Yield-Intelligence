@@ -10,6 +10,7 @@ import type {
   BorrowConcentrationProvider,
   EnrichmentResult,
   IndependentPriceSource,
+  OracleFreshnessProvider,
   RiskDimension,
   RiskEvidence
 } from "./types.js";
@@ -18,7 +19,8 @@ export class IndependentRiskEnricher {
   constructor(
     private readonly priceSource: IndependentPriceSource =
       new DefiLlamaPriceSource(),
-    private readonly concentrationProvider?: BorrowConcentrationProvider
+    private readonly concentrationProvider?: BorrowConcentrationProvider,
+    private readonly oracleFreshnessProvider?: OracleFreshnessProvider
   ) {}
 
   async enrich(input: MarketSnapshot): Promise<EnrichmentResult> {
@@ -86,6 +88,30 @@ export class IndependentRiskEnricher {
       }
     }
 
+    if (this.oracleFreshnessProvider) {
+      const freshness =
+        await this.oracleFreshnessProvider.freshness(snapshot);
+      if (freshness) {
+        snapshot.oracleRiskScore = Math.max(
+          snapshot.oracleRiskScore ?? 0,
+          freshness.riskScore
+        );
+        evidence.push({
+          dimension: "oracle",
+          source: freshness.source,
+          reviewedAt: freshness.observedAt,
+          confidence: freshness.stale ? "LOW" : "HIGH",
+          methodology: freshness.method,
+          value: freshness.riskScore,
+          details: {
+            ageSeconds: freshness.ageSeconds,
+            heartbeatSeconds: freshness.heartbeatSeconds,
+            stale: freshness.stale
+          }
+        });
+      }
+    }
+
     const protocolEvidence = protocolSecurityEvidence(snapshot.protocol);
     if (protocolEvidence) {
       snapshot.smartContractRiskScore = protocolEvidence.value;
@@ -107,23 +133,54 @@ export class IndependentRiskEnricher {
     if (this.concentrationProvider) {
       const concentration =
         await this.concentrationProvider.concentration(snapshot);
-      if (concentration) {
-        snapshot.borrowConcentrationPct = concentration.topBorrowerPct;
+
+      if (
+        concentration &&
+        concentration.complete &&
+        concentration.evidenceCoveragePct >= 99.5
+      ) {
+        snapshot.borrowConcentrationPct =
+          concentration.topBorrowerPct;
         evidence.push({
           dimension: "concentration",
           source: concentration.source,
           reviewedAt: concentration.observedAt,
-          confidence: "MEDIUM",
-          methodology:
-            "Largest observed borrower share of reserve borrows.",
+          confidence: "HIGH",
+          methodology: concentration.methodology,
           value: concentration.topBorrowerPct,
           details: {
-            topBorrowerPct: concentration.topBorrowerPct
+            topBorrowerPct: concentration.topBorrowerPct,
+            top5BorrowersPct:
+              concentration.top5BorrowersPct,
+            borrowerCount: concentration.borrowerCount,
+            evidenceCoveragePct:
+              concentration.evidenceCoveragePct,
+            complete: concentration.complete
           }
         });
       } else {
         snapshot.borrowConcentrationPct = null;
         unresolved.add("concentration");
+
+        if (concentration) {
+          evidence.push({
+            dimension: "concentration",
+            source: concentration.source,
+            reviewedAt: concentration.observedAt,
+            confidence: "LOW",
+            methodology: concentration.methodology,
+            value: null,
+            details: {
+              topBorrowerPct: concentration.topBorrowerPct,
+              top5BorrowersPct:
+                concentration.top5BorrowersPct,
+              borrowerCount: concentration.borrowerCount,
+              evidenceCoveragePct:
+                concentration.evidenceCoveragePct,
+              complete: concentration.complete
+            }
+          });
+        }
       }
     } else {
       snapshot.borrowConcentrationPct = null;
