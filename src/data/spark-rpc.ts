@@ -17,6 +17,7 @@ const DATA_PROVIDER_ABI = [
 
 const ORACLE_ABI = [
   "function getAssetPrice(address asset) view returns (uint256)",
+  "function getSourceOfAsset(address asset) view returns (address)",
   "function BASE_CURRENCY_UNIT() view returns (uint256)"
 ];
 
@@ -98,6 +99,7 @@ export class SparkRpcDataSource implements SparkDataSource {
       symbol,
       tokenDecimals,
       priceRaw,
+      oracleSource,
       baseCurrencyUnit,
       block
     ] = await Promise.all([
@@ -108,6 +110,7 @@ export class SparkRpcDataSource implements SparkDataSource {
       token.symbol() as Promise<string>,
       token.decimals() as Promise<bigint>,
       oracle.getAssetPrice(asset) as Promise<bigint>,
+      oracle.getSourceOfAsset(asset) as Promise<string>,
       oracle.BASE_CURRENCY_UNIT() as Promise<bigint>,
       this.provider.getBlock("latest")
     ]);
@@ -175,7 +178,11 @@ export class SparkRpcDataSource implements SparkDataSource {
       suppliedUsd,
       borrowedUsd,
       availableLiquidityUsd,
-      oracleAddress: deployment.oracle,
+      oracleAddress:
+        oracleSource &&
+        oracleSource !== "0x0000000000000000000000000000000000000000"
+          ? oracleSource
+          : deployment.oracle,
       protocolStatus,
       observedAt,
       source: this.rpcUrl,
