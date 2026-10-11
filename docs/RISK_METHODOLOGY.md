@@ -1,111 +1,88 @@
-# Risk Methodology v0.2.1
+# Risk Methodology v0.3.1
 
 ## Goal
 
-Turn the Risk Engine from an APY/liquidity classifier into an evidence-based decision engine without inventing missing inputs.
+Produce a common, evidence-backed risk decision across Aave, Morpho, Compound and Spark without inventing missing protocol data.
 
-## Decision model
-
-Configured weights:
+## Versioned weights
 
 | Dimension | Weight |
 | --- | ---: |
-| Utilization | 18% |
-| Liquidity | 18% |
-| Borrow concentration | 12% |
-| Stablecoin depeg | 14% |
-| Oracle evidence | 12% |
-| Smart-contract / protocol security | 12% |
-| Chain risk | 7% |
+| Utilization | 16% |
+| Liquidity | 16% |
+| Borrow concentration | 16% |
+| Stablecoin depeg | 16% |
+| Oracle evidence | 14% |
+| Smart-contract / protocol security | 10% |
+| Chain risk | 5% |
 | Protocol operational status | 7% |
 
-A decision requires:
+A normal scored decision requires fresh source data, no LOW/UNKNOWN source confidence, all critical dimensions and at least **80% weighted evidence coverage**.
 
-- fresh source data
-- no LOW/UNKNOWN source confidence
-- all critical dimensions present
-- at least **80% weighted evidence coverage**
+Critical dimensions remain stablecoin depeg for stablecoins, oracle evidence, smart-contract/protocol evidence and chain evidence.
 
-Critical dimensions are:
+## Hard safety gates
 
-- stablecoin depeg evidence for stablecoins
-- oracle evidence
-- smart-contract/protocol evidence
-- chain evidence
+Some failure classes should not be diluted through weighted averaging:
 
-Borrow concentration may remain unresolved temporarily. If it is missing, the decision exposes that fact and reports partial evidence coverage instead of pretending the value is zero.
-
-Scores are renormalized over the available evidence weight.
-
-## Stablecoin evidence
-
-Primary independent source in v0.2.1: DefiLlama Coins API.
-
-The engine compares the independent USD price to $1 and converts absolute deviation into basis points.
-
-Aave's own USD exchange rate is retained as protocol data, but is not used as the independent price source after enrichment.
-
-## Oracle evidence
-
-The oracle registry stores reviewed independent reference-feed metadata:
-
-- provider
-- feed type
-- market-risk category
-- heartbeat
-- deviation threshold
-- source URL
-- review date
-
-Important: the reference Chainlink proxy is not assumed to be identical to the oracle address exposed by Aave. Aave may route through adapters, CAPO, SVR, or other oracle infrastructure.
-
-v0.2.1 therefore scores **reference-oracle quality evidence**, not a complete proof of the live configured Aave oracle path.
-
-Future hardening should add onchain `latestRoundData()` freshness checks and resolve Aave oracle adapter topology.
-
-## Smart-contract / protocol evidence
-
-The protocol registry uses a deterministic, reviewable heuristic over:
-
-- operating history
-- published audits/reviews
-- live bug-bounty coverage
-- onchain governance
-- governance timelock
-- active critical incident state
-
-These are evidence inputs, not guarantees of safety.
-
-## Chain evidence
-
-The chain registry uses a deterministic architecture heuristic over:
-
-- L1 vs rollup architecture
-- centralized sequencer dependency
-- L1 data availability
-- forced inclusion / self-sequencing escape path
-- maturity stage
-- emergency upgrade / exit-window risk
-
-The initial reviewed profiles cover Ethereum, OP Mainnet, and Arbitrum One.
+- protocol paused -> **RED**
+- stablecoin deviation >= **300 bps** -> **RED**
 
 ## Borrow concentration
 
-AaveKit's public user-position interfaces fetch positions for a specified user address. v0.2.1 does not infer market-wide borrower concentration from that API.
+The canonical raw concentration signal is **largest current borrower share of total current debt**.
 
-A future concentration provider must supply independently derived reserve-wide borrower distribution evidence.
+The signal is transformed through versioned bands:
 
-Until then, concentration is explicitly unresolved and reduces evidence coverage by 12%.
+- <=5% -> risk 10
+- <=10% -> risk 25
+- <=20% -> risk 45
+- <=35% -> risk 70
+- >35% -> risk 100
+
+Morpho Blue uses ordered current market positions.
+
+Aave V3 and SparkLend reconstruct the borrower set from complete configured `Borrow` event history and verify current variable-debt-token balances. The signal is accepted only when discovered balances cover at least **99.5%** of current debt.
+
+Compound III remains unresolved because available event-based candidate discovery is not a complete borrower registry.
+
+## Oracle evidence
+
+Oracle evidence has two layers:
+
+1. protocol/reference oracle metadata and warnings;
+2. live freshness evidence when the configured source exposes a supported timestamp.
+
+Chainlink-compatible sources use `latestRoundData().updatedAt`. Morpho uses indexed oracle-state `last_updated_at`.
+
+Freshness can increase oracle risk; it never erases an existing protocol warning.
+
+## Stablecoin evidence
+
+DefiLlama remains the independent spot-price cross-check. Absolute USD deviation is converted to basis points.
 
 ## Calibration
 
-The numeric heuristics in v0.2.1 are intentionally simple and transparent. They are not claimed to be statistically calibrated.
+v0.3.1 introduces versioned historical stress anchors covering:
 
-Calibration should use:
+- normal diversified conditions
+- high utilization / tight liquidity
+- March 2023 USDC depeg
+- November 2022 Aave CRV concentrated borrower stress
+- November 2023 Aave security pause
 
-1. historical incidents and stress periods
-2. observed distributions across the 100+ market dataset
-3. false-positive / false-negative review
-4. protocol-by-protocol compatibility testing
+These anchors verify model behavior against known failure classes. They are not a statistically sufficient training dataset and do not establish predictive accuracy.
 
-The methodology should change only through versioned code and tests.
+See [CALIBRATION.md](CALIBRATION.md).
+
+## Interpretation
+
+`GREEN / WATCH / RED` is a structured research classification.
+
+It is not:
+
+- a probability of default
+- an expected-loss estimate
+- a guarantee of protocol safety
+- an investment recommendation
+- a substitute for legal, financial or security due diligence
