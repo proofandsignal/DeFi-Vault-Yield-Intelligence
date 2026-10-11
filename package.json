@@ -1,13 +1,19 @@
 {
   "name": "defi-vault-yield-intelligence",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "description": "Multi-protocol, multi-chain, multi-asset DeFi risk and yield intelligence core.",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test tests/*.test.ts",
+    "start": "node dist/src/api/server.js",
+    "dev:api": "tsx src/api/server.ts",
+    "api:contract": "tsx scripts/api-contract-smoke.ts",
     "live:aave-smoke": "tsx scripts/live-aave-smoke.ts",
     "validate:aave-100": "tsx scripts/collect-aave-validation.ts",
     "live:risk-smoke": "tsx scripts/live-risk-enrichment-smoke.ts",
