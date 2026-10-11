@@ -6,7 +6,7 @@ Multi-protocol, multi-chain, multi-asset DeFi risk and yield intelligence infras
 
 The project does **not** build a lending protocol. It builds a protocol-neutral intelligence layer above existing DeFi markets and vault infrastructure.
 
-**Everything is multi by architecture.** Aave is Adapter #001, not the product boundary.
+**Everything is multi by architecture.**
 
 ```text
 Aave / Morpho / Compound / Spark
@@ -15,75 +15,58 @@ Aave / Morpho / Compound / Spark
               |
      Canonical Market Schema
               |
-     Independent Risk Evidence
+ Independent Risk Evidence
+  + concentration
+  + oracle freshness
               |
-Risk Engine ------> GREEN / WATCH / RED / VERIFY
+ Calibrated Risk Engine
+ GREEN / WATCH / RED / VERIFY
               |
-Yield Engine -----> Gross / Fees / Costs / Net Yield
+ Yield / Comparison Layer
               |
-Scanner / Reports / Alerts / API / Partner Infrastructure
+Scanner / Reports / Alerts / API
 ```
 
-## Current build — v0.3
+## Current build — v0.3.1
 
-v0.3 validates the canonical core across four different lending designs.
+v0.3.1 turns borrower concentration and calibration into explicit evidence layers.
 
-Adapters:
+Included:
 
-- **Aave V3** — official GraphQL reserve data
-- **Morpho Blue** — official GraphQL isolated lending markets
-- **Compound III** — onchain Comet base-asset markets
-- **SparkLend** — onchain reserve data through its canonical protocol data provider
+- live Aave V3, Morpho Blue, Compound III and SparkLend market data
+- reserve-wide borrower concentration for Morpho Blue
+- complete variable-debt-token holder discovery + current onchain debt reconciliation for Aave V3 and SparkLend
+- explicit unresolved concentration for Compound III
+- >=99.5% debt-reconciliation requirement before Aave/Spark concentration is accepted
+- live oracle freshness where compatible
+- versioned risk weights and thresholds
+- historical stress calibration anchors
+- hard RED gates for protocol pause and material stablecoin depeg
 
-All four normalize into the same `MarketSnapshot` and use the same Risk, Yield, and Decision engines.
-
-The live v0.3 gate compares Ethereum USDC markets and requires:
-
-- canonical APY / supply / borrow / liquidity fields
-- fresh data
-- common independent risk enrichment
-- no unresolved critical risk dimension
-- at least 80% weighted evidence coverage
-
-The provisional cross-protocol comparison uses:
-
-```text
-riskAdjustedYield = grossSupplyAPY * (1 - riskScore / 100)
-```
-
-This is an engineering validation metric, **not** a calibrated investment model or investment recommendation.
+The model remains an **engineering risk model**, not a prediction of loss probability and not investment advice.
 
 ## Evidence boundary
 
-Missing risk dimensions are never silently converted to zero.
+Missing dimensions are never replaced with zero.
 
-Borrow concentration may remain unresolved and is exposed in the result. Oracle evidence is protocol-aware: for example, Morpho Blue's collateral/loan-asset oracle is not replaced by a generic USDC/USD reference feed.
+For Compound III, borrower concentration remains unresolved until a complete borrower enumeration source exists. This is intentional.
 
-See [docs/RISK_METHODOLOGY.md](docs/RISK_METHODOLOGY.md) and [docs/MULTI_PROTOCOL.md](docs/MULTI_PROTOCOL.md).
+See [docs/RISK_METHODOLOGY.md](docs/RISK_METHODOLOGY.md), [docs/CALIBRATION.md](docs/CALIBRATION.md), and [docs/MULTI_PROTOCOL.md](docs/MULTI_PROTOCOL.md).
 
 ## Multi roadmap
 
 Protocol: Aave → Morpho → Compound → Spark → future adapters  
 Chain: Ethereum / Base / Arbitrum / Optimism / future chains  
 Asset: USDC / USDT / USDS / DAI / WETH / future assets  
-Output: scanner / monitoring / reports / API / partner vault infrastructure
+Output: Yield Scanner / monitoring / reports / API / partner infrastructure
 
 ## Safety and legal boundary
 
 The current product is **read-only research infrastructure**.
 
-It does not:
-
-- custody third-party assets
-- accept public deposits
-- execute deposits or withdrawals
-- rebalance public capital
-- provide personalized transaction execution
-- operate a public managed vault
+It does not custody third-party assets, accept public deposits, execute deposits or withdrawals, rebalance public capital, or operate a public managed vault.
 
 **PUBLIC CAPITAL: LOCKED** until the Legal Classification Gate is passed.
-
-See [docs/LEGAL_GATE.md](docs/LEGAL_GATE.md).
 
 ## Development
 
@@ -96,8 +79,7 @@ npm run live:aave-smoke
 npm run validate:aave-100
 npm run live:risk-smoke
 npm run live:multi-protocol
+npm run live:v031
 ```
 
 Live commands require network access.
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/RISK_METHODOLOGY.md](docs/RISK_METHODOLOGY.md), [docs/MULTI_PROTOCOL.md](docs/MULTI_PROTOCOL.md), and [docs/ROADMAP.md](docs/ROADMAP.md).

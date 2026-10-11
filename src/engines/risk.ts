@@ -5,21 +5,14 @@ import type {
   RiskConfidence,
   RiskStatus
 } from "../domain/types.js";
+import {
+  concentrationRiskScore,
+  RISK_MODEL_V031,
+  type RiskModelConfig
+} from "../risk-model.js";
 
-const MIN_DECISION_COVERAGE = 0.8;
-
-const WEIGHTS: Record<keyof RiskBreakdown, number> = {
-  utilization: 0.18,
-  liquidity: 0.18,
-  concentration: 0.12,
-  depeg: 0.14,
-  oracle: 0.12,
-  smartContract: 0.12,
-  chain: 0.07,
-  protocol: 0.07
-};
-
-const clamp = (value: number): number => Math.max(0, Math.min(100, value));
+const clamp = (value: number): number =>
+  Math.max(0, Math.min(100, value));
 
 function utilizationRisk(snapshot: MarketSnapshot): number | null {
   if (
@@ -53,7 +46,9 @@ function depegRisk(snapshot: MarketSnapshot): number | null {
   return clamp(Math.abs(snapshot.stablecoinDepegBps) / 2);
 }
 
-function protocolRisk(status: MarketSnapshot["protocolStatus"]): number | null {
+function protocolRisk(
+  status: MarketSnapshot["protocolStatus"]
+): number | null {
   switch (status) {
     case "operational":
       return 10;
@@ -66,26 +61,36 @@ function protocolRisk(status: MarketSnapshot["protocolStatus"]): number | null {
   }
 }
 
-function statusFromScore(score: number): RiskStatus {
-  if (score <= 30) return "GREEN";
-  if (score <= 60) return "WATCH";
+function statusFromScore(
+  score: number,
+  model: RiskModelConfig
+): RiskStatus {
+  if (score <= model.greenMaxScore) return "GREEN";
+  if (score <= model.watchMaxScore) return "WATCH";
   return "RED";
 }
 
 function confidenceFromCoverage(
   coverage: number,
-  sourceConfidence: MarketSnapshot["dataQuality"]["confidence"]
+  sourceConfidence: MarketSnapshot["dataQuality"]["confidence"],
+  model: RiskModelConfig
 ): RiskConfidence {
   if (coverage >= 0.999 && sourceConfidence === "HIGH") return "HIGH";
-  if (coverage >= MIN_DECISION_COVERAGE) return "MEDIUM";
+  if (coverage >= model.minDecisionCoverage) return "MEDIUM";
   return "LOW";
 }
 
-export function assessRisk(snapshot: MarketSnapshot): RiskAssessment {
+export function assessRisk(
+  snapshot: MarketSnapshot,
+  model: RiskModelConfig = RISK_MODEL_V031
+): RiskAssessment {
   const breakdown: RiskBreakdown = {
     utilization: utilizationRisk(snapshot),
     liquidity: liquidityRisk(snapshot),
-    concentration: snapshot.borrowConcentrationPct,
+    concentration: concentrationRiskScore(
+      snapshot.borrowConcentrationPct,
+      model
+    ),
     depeg: depegRisk(snapshot),
     oracle: snapshot.oracleRiskScore,
     smartContract: snapshot.smartContractRiskScore,
@@ -102,14 +107,16 @@ export function assessRisk(snapshot: MarketSnapshot): RiskAssessment {
     criticalRiskBlocks.push("depeg");
   }
   if (breakdown.oracle === null) criticalRiskBlocks.push("oracle");
-  if (breakdown.smartContract === null) criticalRiskBlocks.push("smartContract");
+  if (breakdown.smartContract === null) {
+    criticalRiskBlocks.push("smartContract");
+  }
   if (breakdown.chain === null) criticalRiskBlocks.push("chain");
 
   const availableWeight = Object.entries(breakdown).reduce(
     (total, [key, value]) =>
       value === null || !Number.isFinite(value)
         ? total
-        : total + WEIGHTS[key as keyof RiskBreakdown],
+        : total + model.weights[key as keyof RiskBreakdown],
     0
   );
 
@@ -131,25 +138,50 @@ export function assessRisk(snapshot: MarketSnapshot): RiskAssessment {
   }
 
   const reasons: string[] = [];
-  if ((breakdown.utilization ?? 0) > 80) reasons.push("High market utilization.");
-  if ((breakdown.liquidity ?? 0) > 70) reasons.push("Low available liquidity.");
-  if ((breakdown.concentration ?? 0) > 60) reasons.push("Borrow concentration is elevated.");
-  if ((breakdown.depeg ?? 0) > 50) reasons.push("Asset depeg risk is elevated.");
-  if (snapshot.protocolStatus === "degraded") reasons.push("Protocol status is degraded.");
-  if (snapshot.protocolStatus === "paused") reasons.push("Protocol is paused.");
+  if ((breakdown.utilization ?? 0) > 80) {
+    reasons.push("High market utilization.");
+  }
+  if ((breakdown.liquidity ?? 0) > 70) {
+    reasons.push("Low available liquidity.");
+  }
+  if ((snapshot.borrowConcentrationPct ?? 0) > 20) {
+    reasons.push("Top-borrower concentration is elevated.");
+  }
+  if ((breakdown.depeg ?? 0) > 50) {
+    reasons.push("Asset depeg risk is elevated.");
+  }
+  if (snapshot.protocolStatus === "degraded") {
+    reasons.push("Protocol status is degraded.");
+  }
+  if (snapshot.protocolStatus === "paused") {
+    reasons.push("Protocol is paused.");
+  }
   if (coverage < 1) {
     reasons.push(
       `Decision uses partial evidence coverage: ${coveragePct}% of configured risk weight.`
     );
   }
 
-  if (snapshot.protocolStatus === "paused") {
+  const hardDepeg =
+    snapshot.asset.isStablecoin === true &&
+    snapshot.stablecoinDepegBps !== null &&
+    Math.abs(snapshot.stablecoinDepegBps) >=
+      model.hardStablecoinDepegBps;
+
+  if (hardDepeg) {
+    reasons.unshift(
+      `Stablecoin depeg exceeded the ${model.hardStablecoinDepegBps} bps hard safety gate.`
+    );
+  }
+
+  if (snapshot.protocolStatus === "paused" || hardDepeg) {
     return {
       score: null,
       status: "RED",
       confidence: confidenceFromCoverage(
         coverage,
-        snapshot.dataQuality.confidence
+        snapshot.dataQuality.confidence,
+        model
       ),
       coveragePct,
       breakdown,
@@ -175,14 +207,15 @@ export function assessRisk(snapshot: MarketSnapshot): RiskAssessment {
   if (
     dataQualityBlocks.length > 0 ||
     criticalRiskBlocks.length > 0 ||
-    coverage < MIN_DECISION_COVERAGE
+    coverage < model.minDecisionCoverage
   ) {
     return {
       score: null,
       status: "VERIFY",
       confidence: confidenceFromCoverage(
         coverage,
-        snapshot.dataQuality.confidence
+        snapshot.dataQuality.confidence,
+        model
       ),
       coveragePct,
       breakdown,
@@ -197,7 +230,7 @@ export function assessRisk(snapshot: MarketSnapshot): RiskAssessment {
   const weightedRisk = Object.entries(breakdown).reduce(
     (total, [key, value]) => {
       if (value === null || !Number.isFinite(value)) return total;
-      return total + value * WEIGHTS[key as keyof RiskBreakdown];
+      return total + value * model.weights[key as keyof RiskBreakdown];
     },
     0
   );
@@ -206,10 +239,11 @@ export function assessRisk(snapshot: MarketSnapshot): RiskAssessment {
 
   return {
     score: Math.round(score * 100) / 100,
-    status: statusFromScore(score),
+    status: statusFromScore(score, model),
     confidence: confidenceFromCoverage(
       coverage,
-      snapshot.dataQuality.confidence
+      snapshot.dataQuality.confidence,
+      model
     ),
     coveragePct,
     breakdown,

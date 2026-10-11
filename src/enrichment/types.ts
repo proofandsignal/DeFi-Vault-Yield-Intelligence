@@ -31,6 +31,11 @@ export interface IndependentPriceSource {
 
 export interface BorrowConcentrationResult {
   topBorrowerPct: number;
+  top5BorrowersPct: number | null;
+  borrowerCount: number | null;
+  evidenceCoveragePct: number;
+  complete: boolean;
+  methodology: string;
   source: string;
   observedAt: string;
 }
@@ -39,6 +44,22 @@ export interface BorrowConcentrationProvider {
   concentration(
     snapshot: MarketSnapshot
   ): Promise<BorrowConcentrationResult | null>;
+}
+
+export interface OracleFreshnessResult {
+  ageSeconds: number;
+  heartbeatSeconds: number;
+  stale: boolean;
+  riskScore: number;
+  source: string;
+  observedAt: string;
+  method: string;
+}
+
+export interface OracleFreshnessProvider {
+  freshness(
+    snapshot: MarketSnapshot
+  ): Promise<OracleFreshnessResult | null>;
 }
 
 export interface EnrichmentResult {
