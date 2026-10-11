@@ -147,15 +147,19 @@ export class MorphoBorrowConcentrationProvider
   }
 }
 
-interface BlockscoutHolder {
-  address: string;
-  value: string;
+interface BlockscoutV2Holder {
+  address?: string | {
+    hash?: string;
+  };
+  value?: string;
 }
 
-interface BlockscoutResponse {
-  status?: string;
-  message?: string;
-  result?: BlockscoutHolder[] | string;
+interface BlockscoutV2Response {
+  items?: BlockscoutV2Holder[];
+  next_page_params?: Record<
+    string,
+    string | number | boolean | null
+  > | null;
 }
 
 export class AaveLikeBorrowConcentrationProvider
@@ -197,12 +201,20 @@ export class AaveLikeBorrowConcentrationProvider
     debtTokenAddress: string
   ): Promise<string[] | null> {
     const holders = new Set<string>();
-    const offset = 1000;
+    let cursor:
+      | Record<string, string | number | boolean | null>
+      | null = {};
 
-    for (let page = 1; page <= 100; page += 1) {
-      const url =
-        `${this.blockscoutBase}/api?module=token&action=getTokenHolders` +
-        `&contractaddress=${debtTokenAddress}&page=${page}&offset=${offset}`;
+    for (let page = 0; page < 1000; page += 1) {
+      const url = new URL(
+        `${this.blockscoutBase}/api/v2/tokens/${debtTokenAddress}/holders`
+      );
+
+      for (const [key, value] of Object.entries(cursor ?? {})) {
+        if (value !== null) {
+          url.searchParams.set(key, String(value));
+        }
+      }
 
       let response: Response | null = null;
 
@@ -231,32 +243,41 @@ export class AaveLikeBorrowConcentrationProvider
 
       if (!response?.ok) {
         throw new Error(
-          `Blockscout holder discovery HTTP ${response?.status ?? "unknown"} for ${debtTokenAddress} after bounded retry.`
+          `Blockscout v2 holder discovery HTTP ${response?.status ?? "unknown"} for ${debtTokenAddress} after bounded retry.`
         );
       }
 
-      const payload = (await response.json()) as BlockscoutResponse;
-      if (
-        payload.status !== "1" ||
-        !Array.isArray(payload.result)
-      ) {
+      const payload =
+        (await response.json()) as BlockscoutV2Response;
+
+      if (!Array.isArray(payload.items)) {
         throw new Error(
-          `Blockscout holder discovery failed for ${debtTokenAddress}: status=${payload.status ?? "missing"} message=${payload.message ?? "missing"} result=${typeof payload.result === "string" ? payload.result : "non-array"}`
+          `Blockscout v2 holder response did not include items for ${debtTokenAddress}.`
         );
       }
 
-      for (const holder of payload.result) {
-        if (/^0x[a-fA-F0-9]{40}$/.test(holder.address)) {
-          holders.add(holder.address.toLowerCase());
+      for (const holder of payload.items) {
+        const address =
+          typeof holder.address === "string"
+            ? holder.address
+            : holder.address?.hash;
+
+        if (
+          address &&
+          /^0x[a-fA-F0-9]{40}$/.test(address)
+        ) {
+          holders.add(address.toLowerCase());
         }
       }
 
-      if (payload.result.length < offset) {
-        return [...holders];
-      }
+      cursor = payload.next_page_params ?? null;
+      if (!cursor) return [...holders];
+
+      // Stay below the public v2 per-IP request rate even when many pages exist.
+      await new Promise((resolve) => setTimeout(resolve, 450));
     }
 
-    // Safety cap: do not treat a truncated holder index as complete.
+    // Safety cap: never treat truncated cursor traversal as complete.
     return null;
   }
 
@@ -370,7 +391,7 @@ export class AaveLikeBorrowConcentrationProvider
       methodology:
         "Blockscout enumerates current variable-debt-token holder addresses. Current balances are then read independently on-chain through Multicall3 and reconciled against on-chain totalSupply. Risk scoring accepts the result only at >=99.5% debt coverage.",
       source:
-        `${this.blockscoutBase}/api?module=token&action=getTokenHolders&contractaddress=${debtTokenAddress}` +
+        `${this.blockscoutBase}/api/v2/tokens/${debtTokenAddress}/holders` +
         ` + ${this.rpcUrl}#balanceOf,totalSupply`,
       observedAt: new Date().toISOString()
     };
