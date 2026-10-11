@@ -197,13 +197,27 @@ export class AaveLikeBorrowConcentrationProvider
     );
   }
 
-  private async holderCandidates(
-    debtTokenAddress: string
-  ): Promise<string[] | null> {
-    const holders = new Set<string>();
+  private async holderBalancesUntilCoverage(
+    debtTokenAddress: string,
+    totalDebt: bigint
+  ): Promise<{
+    balances: bigint[];
+    discoveredAddresses: number;
+    coveragePct: number;
+    cursorExhausted: boolean;
+  } | null> {
+    const seen = new Set<string>();
+    const balances: bigint[] = [];
+    let observedDebt = 0n;
     let cursor:
       | Record<string, string | number | boolean | null>
       | null = {};
+
+    const multicall = new Contract(
+      MULTICALL3,
+      MULTICALL_ABI,
+      this.provider
+    );
 
     for (let page = 0; page < 1000; page += 1) {
       const url = new URL(
@@ -256,6 +270,8 @@ export class AaveLikeBorrowConcentrationProvider
         );
       }
 
+      const newAddresses: string[] = [];
+
       for (const holder of payload.items) {
         const address =
           typeof holder.address === "string"
@@ -266,18 +282,88 @@ export class AaveLikeBorrowConcentrationProvider
           address &&
           /^0x[a-fA-F0-9]{40}$/.test(address)
         ) {
-          holders.add(address.toLowerCase());
+          const normalized = address.toLowerCase();
+          if (!seen.has(normalized)) {
+            seen.add(normalized);
+            newAddresses.push(normalized);
+          }
         }
       }
 
-      cursor = payload.next_page_params ?? null;
-      if (!cursor) return [...holders];
+      if (seen.size > 50_000) {
+        return {
+          balances,
+          discoveredAddresses: seen.size,
+          coveragePct:
+            Number((observedDebt * 1_000_000n) / totalDebt) /
+            10_000,
+          cursorExhausted: false
+        };
+      }
 
-      // Stay below the public v2 per-IP request rate even when many pages exist.
+      const pageBalances = await mapInBatches(
+        newAddresses,
+        300,
+        async (batch) => {
+          const calls = batch.map((address) => ({
+            target: debtTokenAddress,
+            allowFailure: true,
+            callData: ERC20_INTERFACE.encodeFunctionData(
+              "balanceOf",
+              [address]
+            )
+          }));
+
+          const results =
+            (await multicall.aggregate3(calls)) as Array<{
+              success: boolean;
+              returnData: string;
+            }>;
+
+          return results.map((result) => {
+            if (!result.success) return 0n;
+            const decoded =
+              ERC20_INTERFACE.decodeFunctionResult(
+                "balanceOf",
+                result.returnData
+              );
+            return decoded[0] as bigint;
+          });
+        }
+      );
+
+      for (const balance of pageBalances) {
+        balances.push(balance);
+        observedDebt += balance;
+      }
+
+      const coveragePct =
+        Number((observedDebt * 1_000_000n) / totalDebt) /
+        10_000;
+
+      if (coveragePct >= 99.5) {
+        return {
+          balances,
+          discoveredAddresses: seen.size,
+          coveragePct,
+          cursorExhausted: false
+        };
+      }
+
+      cursor = payload.next_page_params ?? null;
+      if (!cursor) {
+        return {
+          balances,
+          discoveredAddresses: seen.size,
+          coveragePct,
+          cursorExhausted: true
+        };
+      }
+
+      // Stay below the public v2 per-IP request rate.
       await new Promise((resolve) => setTimeout(resolve, 450));
     }
 
-    // Safety cap: never treat truncated cursor traversal as complete.
     return null;
   }
 
@@ -311,67 +397,41 @@ export class AaveLikeBorrowConcentrationProvider
       };
     }
 
-    const candidates = await this.holderCandidates(debtTokenAddress);
-    if (!candidates || candidates.length === 0) return null;
+    const holderEvidence =
+      await this.holderBalancesUntilCoverage(
+        debtTokenAddress,
+        totalDebt
+      );
 
-    if (candidates.length > 50_000) {
+    if (!holderEvidence) return null;
+
+    const {
+      balances,
+      discoveredAddresses,
+      coveragePct,
+      cursorExhausted
+    } = holderEvidence;
+
+    if (
+      discoveredAddresses > 50_000 &&
+      coveragePct < 99.5
+    ) {
       return {
         topBorrowerPct: 0,
         top5BorrowersPct: 0,
-        borrowerCount: candidates.length,
-        evidenceCoveragePct: 0,
+        borrowerCount: discoveredAddresses,
+        evidenceCoveragePct: Math.min(100, coveragePct),
         complete: false,
         methodology:
-          "Debt-token holder candidate set exceeded the v0.3.1 safety cap; result intentionally not used for risk scoring.",
+          "Debt-token holder traversal exceeded the v0.3.1 safety cap before reaching the 99.5% on-chain reconciliation threshold.",
         source: `${this.blockscoutBase}#${debtTokenAddress}`,
         observedAt: new Date().toISOString()
       };
     }
 
-    const multicall = new Contract(
-      MULTICALL3,
-      MULTICALL_ABI,
-      this.provider
-    );
-
-    const balances = await mapInBatches(
-      candidates,
-      300,
-      async (batch) => {
-        const calls = batch.map((address) => ({
-          target: debtTokenAddress,
-          allowFailure: true,
-          callData: ERC20_INTERFACE.encodeFunctionData(
-            "balanceOf",
-            [address]
-          )
-        }));
-
-        const results = (await multicall.aggregate3(calls)) as Array<{
-          success: boolean;
-          returnData: string;
-        }>;
-
-        return results.map((result) => {
-          if (!result.success) return 0n;
-          const decoded = ERC20_INTERFACE.decodeFunctionResult(
-            "balanceOf",
-            result.returnData
-          );
-          return decoded[0] as bigint;
-        });
-      }
-    );
-
     const nonZero = balances.filter((balance) => balance > 0n);
     nonZero.sort((a, b) => (a === b ? 0 : a > b ? -1 : 1));
 
-    const observedDebt = nonZero.reduce(
-      (sum, balance) => sum + balance,
-      0n
-    );
-    const coveragePct =
-      Number((observedDebt * 1_000_000n) / totalDebt) / 10_000;
     const complete = coveragePct >= 99.5;
 
     const top = nonZero[0] ?? 0n;
@@ -389,7 +449,8 @@ export class AaveLikeBorrowConcentrationProvider
       evidenceCoveragePct: Math.min(100, coveragePct),
       complete,
       methodology:
-        "Blockscout enumerates current variable-debt-token holder addresses. Current balances are then read independently on-chain through Multicall3 and reconciled against on-chain totalSupply. Risk scoring accepts the result only at >=99.5% debt coverage.",
+        "Blockscout v2 cursor pagination discovers variable-debt-token holder addresses. Current balances are read independently on-chain through Multicall3 and reconciled against on-chain totalSupply. Traversal may stop early only after on-chain coverage reaches >=99.5%; otherwise it must exhaust the cursor. cursorExhausted=" +
+        String(cursorExhausted),
       source:
         `${this.blockscoutBase}/api/v2/tokens/${debtTokenAddress}/holders` +
         ` + ${this.rpcUrl}#balanceOf,totalSupply`,
