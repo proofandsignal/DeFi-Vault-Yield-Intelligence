@@ -46,8 +46,7 @@ const server = createServer(async (req, res) => {
       JSON.stringify({
         error: {
           code: "INTERNAL",
-          message:
-            error instanceof Error ? error.message : String(error)
+          message: "Internal server error."
         }
       })
     );
