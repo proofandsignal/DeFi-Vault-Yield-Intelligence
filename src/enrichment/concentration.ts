@@ -20,7 +20,7 @@ const ERC20_ABI = [
 ];
 
 const MULTICALL_ABI = [
-  "function aggregate3(tuple(address target,bool allowFailure,bytes callData)[] calls) payable returns (tuple(bool success,bytes returnData)[] returnData)"
+  "function aggregate3(tuple(address target,bool allowFailure,bytes callData)[] calls) payable view returns (tuple(bool success,bytes returnData)[] returnData)"
 ];
 
 const ERC20_INTERFACE = new Interface(ERC20_ABI);
