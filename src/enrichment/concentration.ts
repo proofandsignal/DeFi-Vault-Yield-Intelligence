@@ -197,9 +197,9 @@ export class AaveLikeBorrowConcentrationProvider
     debtTokenAddress: string
   ): Promise<string[] | null> {
     const holders = new Set<string>();
-    const offset = 1000;
+    const offset = 100;
 
-    for (let page = 1; page <= 100; page += 1) {
+    for (let page = 1; page <= 500; page += 1) {
       const url =
         `${this.blockscoutBase}/api?module=token&action=getTokenHolders` +
         `&contractaddress=${debtTokenAddress}&page=${page}&offset=${offset}`;
@@ -210,14 +210,20 @@ export class AaveLikeBorrowConcentrationProvider
           "user-agent": "defi-vault-yield-intelligence/0.3.1"
         }
       });
-      if (!response.ok) return null;
+      if (!response.ok) {
+        throw new Error(
+          `Blockscout holder discovery HTTP ${response.status} for ${debtTokenAddress}.`
+        );
+      }
 
       const payload = (await response.json()) as BlockscoutResponse;
       if (
         payload.status !== "1" ||
         !Array.isArray(payload.result)
       ) {
-        return null;
+        throw new Error(
+          `Blockscout holder discovery failed for ${debtTokenAddress}: status=${payload.status ?? "missing"} message=${payload.message ?? "missing"} result=${typeof payload.result === "string" ? payload.result : "non-array"}`
+        );
       }
 
       for (const holder of payload.result) {
