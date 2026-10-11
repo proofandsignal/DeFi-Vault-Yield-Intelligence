@@ -1,8 +1,7 @@
 import {
   Contract,
   Interface,
-  JsonRpcProvider,
-  zeroPadValue
+  JsonRpcProvider
 } from "ethers";
 
 import type { MarketSnapshot } from "../domain/types.js";
@@ -12,11 +11,8 @@ import type {
 } from "./types.js";
 
 const MORPHO_GRAPHQL_URL = "https://api.morpho.org/graphql";
+const BLOCKSCOUT_ETHEREUM_URL = "https://eth.blockscout.com";
 const MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11";
-
-const AAVE_LIKE_POOL_ABI = [
-  "function getReserveVariableDebtToken(address asset) view returns (address)"
-];
 
 const ERC20_ABI = [
   "function totalSupply() view returns (uint256)",
@@ -27,30 +23,17 @@ const MULTICALL_ABI = [
   "function aggregate3(tuple(address target,bool allowFailure,bytes callData)[] calls) payable returns (tuple(bool success,bytes returnData)[] returnData)"
 ];
 
-const BORROW_INTERFACE = new Interface([
-  "event Borrow(address indexed reserve,address user,address indexed onBehalfOf,uint256 amount,uint8 interestRateMode,uint256 borrowRate,uint16 indexed referralCode)"
-]);
-
 const ERC20_INTERFACE = new Interface(ERC20_ABI);
-const BORROW_TOPIC = BORROW_INTERFACE.getEvent("Borrow")!.topicHash;
 
 const DEBT_TOKEN_BY_POOL_ASSET: Record<string, string> = {
+  "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48":
+    "0x72e95b8931767c79ba4eee721354d6e99a61d004",
   "0xc13e21b648a5ee794902342038ff3adab66be987:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48":
-    "0x7B70D04099CB9cfb1Db7B6820baDAfB4C5C70A67"
-};
-
-const START_BLOCK_BY_POOL: Record<string, number> = {
-  // Conservative blocks before the corresponding Ethereum deployments.
-  "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2": 16_200_000,
-  "0xc13e21b648a5ee794902342038ff3adab66be987": 17_000_000
+    "0x7b70d04099cb9cfb1db7b6820badafb4c5c70a67"
 };
 
 function clampPct(value: number): number {
   return Math.max(0, Math.min(100, value));
-}
-
-function addressFromTopic(topic: string): string {
-  return `0x${topic.slice(-40)}`.toLowerCase();
 }
 
 async function mapInBatches<T, R>(
@@ -164,6 +147,17 @@ export class MorphoBorrowConcentrationProvider
   }
 }
 
+interface BlockscoutHolder {
+  address: string;
+  value: string;
+}
+
+interface BlockscoutResponse {
+  status?: string;
+  message?: string;
+  result?: BlockscoutHolder[] | string;
+}
+
 export class AaveLikeBorrowConcentrationProvider
   implements BorrowConcentrationProvider
 {
@@ -171,7 +165,9 @@ export class AaveLikeBorrowConcentrationProvider
 
   constructor(
     private readonly rpcUrl =
-      process.env.EVM_RPC_URL ?? "https://ethereum-rpc.publicnode.com"
+      process.env.EVM_RPC_URL ?? "https://ethereum-rpc.publicnode.com",
+    private readonly fetchFn: typeof fetch = fetch,
+    private readonly blockscoutBase = BLOCKSCOUT_ETHEREUM_URL
   ) {
     this.provider = new JsonRpcProvider(this.rpcUrl);
   }
@@ -186,49 +182,57 @@ export class AaveLikeBorrowConcentrationProvider
     return null;
   }
 
-  private async borrowerCandidates(
-    pool: string,
-    asset: string,
-    fromBlock: number,
-    toBlock: number
-  ): Promise<Set<string>> {
-    const candidates = new Set<string>();
-    let start = fromBlock;
-    let chunk = 250_000;
+  private debtTokenAddress(
+    snapshot: MarketSnapshot,
+    pool: string
+  ): string | null {
+    return (
+      DEBT_TOKEN_BY_POOL_ASSET[
+        `${pool}:${snapshot.asset.address.toLowerCase()}`
+      ] ?? null
+    );
+  }
 
-    while (start <= toBlock) {
-      const end = Math.min(toBlock, start + chunk - 1);
+  private async holderCandidates(
+    debtTokenAddress: string
+  ): Promise<string[] | null> {
+    const holders = new Set<string>();
+    const offset = 1000;
 
-      try {
-        const logs = await this.provider.getLogs({
-          address: pool,
-          fromBlock: start,
-          toBlock: end,
-          topics: [
-            BORROW_TOPIC,
-            zeroPadValue(asset.toLowerCase(), 32)
-          ]
-        });
+    for (let page = 1; page <= 100; page += 1) {
+      const url =
+        `${this.blockscoutBase}/api?module=token&action=getTokenHolders` +
+        `&contractaddress=${debtTokenAddress}&page=${page}&offset=${offset}`;
 
-        for (const log of logs) {
-          if (log.topics[2]) {
-            candidates.add(addressFromTopic(log.topics[2]));
-          }
+      const response = await this.fetchFn(url, {
+        headers: {
+          accept: "application/json",
+          "user-agent": "defi-vault-yield-intelligence/0.3.1"
         }
+      });
+      if (!response.ok) return null;
 
-        start = end + 1;
-        chunk = Math.min(250_000, chunk * 2);
-      } catch {
-        if (chunk <= 5_000) {
-          throw new Error(
-            `Unable to scan complete Borrow history for ${pool} at block ${start}.`
-          );
+      const payload = (await response.json()) as BlockscoutResponse;
+      if (
+        payload.status !== "1" ||
+        !Array.isArray(payload.result)
+      ) {
+        return null;
+      }
+
+      for (const holder of payload.result) {
+        if (/^0x[a-fA-F0-9]{40}$/.test(holder.address)) {
+          holders.add(holder.address.toLowerCase());
         }
-        chunk = Math.max(5_000, Math.floor(chunk / 2));
+      }
+
+      if (payload.result.length < offset) {
+        return [...holders];
       }
     }
 
-    return candidates;
+    // Safety cap: do not treat a truncated holder index as complete.
+    return null;
   }
 
   async concentration(
@@ -237,37 +241,8 @@ export class AaveLikeBorrowConcentrationProvider
     const pool = this.poolAddress(snapshot);
     if (!pool || snapshot.chainId !== 1) return null;
 
-    const fromBlock = START_BLOCK_BY_POOL[pool];
-    if (!fromBlock) return null;
-
-    const latest = await this.provider.getBlockNumber();
-    const candidates = await this.borrowerCandidates(
-      pool,
-      snapshot.asset.address,
-      fromBlock,
-      latest
-    );
-
-    const poolContract = new Contract(
-      pool,
-      AAVE_LIKE_POOL_ABI,
-      this.provider
-    );
-    const fallbackDebtToken =
-      DEBT_TOKEN_BY_POOL_ASSET[
-        `${pool}:${snapshot.asset.address.toLowerCase()}`
-      ];
-
-    let debtTokenAddress: string;
-    try {
-      debtTokenAddress =
-        (await poolContract.getReserveVariableDebtToken(
-          snapshot.asset.address
-        )) as string;
-    } catch {
-      if (!fallbackDebtToken) return null;
-      debtTokenAddress = fallbackDebtToken;
-    }
+    const debtTokenAddress = this.debtTokenAddress(snapshot, pool);
+    if (!debtTokenAddress) return null;
 
     const debtToken = new Contract(
       debtTokenAddress,
@@ -284,22 +259,25 @@ export class AaveLikeBorrowConcentrationProvider
         evidenceCoveragePct: 100,
         complete: true,
         methodology:
-          "Complete pool Borrow-event history plus current variable-debt-token balances; reserve currently has zero debt.",
-        source: `${this.rpcUrl}#${pool}`,
+          "Current variable-debt-token total supply is zero; borrower concentration is zero.",
+        source: `${this.rpcUrl}#${debtTokenAddress}`,
         observedAt: new Date().toISOString()
       };
     }
 
-    if (candidates.size > 50_000) {
+    const candidates = await this.holderCandidates(debtTokenAddress);
+    if (!candidates || candidates.length === 0) return null;
+
+    if (candidates.length > 50_000) {
       return {
         topBorrowerPct: 0,
         top5BorrowersPct: 0,
-        borrowerCount: candidates.size,
+        borrowerCount: candidates.length,
         evidenceCoveragePct: 0,
         complete: false,
         methodology:
-          "Borrower candidate set exceeded the v0.3.1 safety cap; result intentionally not used for risk scoring.",
-        source: `${this.rpcUrl}#${pool}`,
+          "Debt-token holder candidate set exceeded the v0.3.1 safety cap; result intentionally not used for risk scoring.",
+        source: `${this.blockscoutBase}#${debtTokenAddress}`,
         observedAt: new Date().toISOString()
       };
     }
@@ -309,10 +287,9 @@ export class AaveLikeBorrowConcentrationProvider
       MULTICALL_ABI,
       this.provider
     );
-    const candidateList = [...candidates];
 
     const balances = await mapInBatches(
-      candidateList,
+      candidates,
       300,
       async (batch) => {
         const calls = batch.map((address) => ({
@@ -366,8 +343,10 @@ export class AaveLikeBorrowConcentrationProvider
       evidenceCoveragePct: Math.min(100, coveragePct),
       complete,
       methodology:
-        "Scans the complete configured pool Borrow-event history, discovers every onBehalfOf borrower, reads current variable-debt-token balances through Multicall3, and verifies discovered balances against total debt. Risk scoring accepts the result only at >=99.5% debt coverage.",
-      source: `${this.rpcUrl}#${pool}:Borrow:${fromBlock}-${latest}`,
+        "Blockscout enumerates current variable-debt-token holder addresses. Current balances are then read independently on-chain through Multicall3 and reconciled against on-chain totalSupply. Risk scoring accepts the result only at >=99.5% debt coverage.",
+      source:
+        `${this.blockscoutBase}/api?module=token&action=getTokenHolders&contractaddress=${debtTokenAddress}` +
+        ` + ${this.rpcUrl}#balanceOf,totalSupply`,
       observedAt: new Date().toISOString()
     };
   }
