@@ -34,6 +34,11 @@ const BORROW_INTERFACE = new Interface([
 const ERC20_INTERFACE = new Interface(ERC20_ABI);
 const BORROW_TOPIC = BORROW_INTERFACE.getEvent("Borrow")!.topicHash;
 
+const DEBT_TOKEN_BY_POOL_ASSET: Record<string, string> = {
+  "0xc13e21b648a5ee794902342038ff3adab66be987:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48":
+    "0x7B70D04099CB9cfb1Db7B6820baDAfB4C5C70A67"
+};
+
 const START_BLOCK_BY_POOL: Record<string, number> = {
   // Conservative blocks before the corresponding Ethereum deployments.
   "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2": 16_200_000,
@@ -248,10 +253,21 @@ export class AaveLikeBorrowConcentrationProvider
       AAVE_LIKE_POOL_ABI,
       this.provider
     );
-    const debtTokenAddress =
-      (await poolContract.getReserveVariableDebtToken(
-        snapshot.asset.address
-      )) as string;
+    const fallbackDebtToken =
+      DEBT_TOKEN_BY_POOL_ASSET[
+        `${pool}:${snapshot.asset.address.toLowerCase()}`
+      ];
+
+    let debtTokenAddress: string;
+    try {
+      debtTokenAddress =
+        (await poolContract.getReserveVariableDebtToken(
+          snapshot.asset.address
+        )) as string;
+    } catch {
+      if (!fallbackDebtToken) return null;
+      debtTokenAddress = fallbackDebtToken;
+    }
 
     const debtToken = new Contract(
       debtTokenAddress,
