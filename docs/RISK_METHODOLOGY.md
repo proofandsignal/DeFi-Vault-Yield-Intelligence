@@ -42,7 +42,7 @@ The signal is transformed through versioned bands:
 
 Morpho Blue uses ordered current market positions.
 
-Aave V3 and SparkLend reconstruct the borrower set from complete configured `Borrow` event history and verify current variable-debt-token balances. The signal is accepted only when discovered balances cover at least **99.5%** of current debt.
+Aave V3 and SparkLend enumerate variable-debt-token holder addresses through Blockscout, then independently read current `balanceOf` values on-chain. The signal is accepted only when those on-chain balances reconcile to at least **99.5%** of on-chain variable-debt-token `totalSupply`.
 
 Compound III remains unresolved because available event-based candidate discovery is not a complete borrower registry.
 
