@@ -47,7 +47,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          headers=$(curl --silent --show-error --head --max-time 60             "$BASE_URL/go/scanner?source=production-smoke&campaign=landing002")
+          headers=$(curl --silent --show-error --dump-header - --output /dev/null --max-time 60             "$BASE_URL/go/scanner?source=production-smoke&campaign=landing002")
 
           echo "$headers" | grep -Eiq "^HTTP/.* 302"
           echo "$headers" | grep -Eiq "^location: .*\/scanner\?source=production-smoke&campaign=landing002"
