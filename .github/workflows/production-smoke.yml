@@ -1,0 +1,96 @@
+name: Production Smoke
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  production-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE_URL: https://defi-vault-yield-intelligence.onrender.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check deployed health endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error             --retry 5 --retry-delay 5             --max-time 60             "$BASE_URL/health" > /tmp/health.json
+
+          node - <<'NODE'
+          const fs = require("fs");
+          const body = JSON.parse(fs.readFileSync("/tmp/health.json", "utf8"));
+          if (body.status !== "ok") throw new Error("health.status is not ok");
+          if (body.version !== "0.4.0") throw new Error("unexpected deployed version");
+          if (body.mode !== "READ_ONLY") throw new Error("service is not READ_ONLY");
+          if (body.publicCapital !== "LOCKED") throw new Error("public capital lock missing");
+          console.log(JSON.stringify(body));
+          NODE
+
+      - name: Check deployed scanner page
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error             --retry 5 --retry-delay 5             --max-time 60             "$BASE_URL/scanner" > /tmp/scanner.html
+
+          grep -q "DeFi Vault & Yield Intelligence" /tmp/scanner.html
+          grep -q "Scan live markets" /tmp/scanner.html
+          grep -q "Public capital remains locked" /tmp/scanner.html
+
+      - name: Check deployed live scanner API
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error             --retry 3 --retry-delay 5             --max-time 240             "$BASE_URL/api/v1/scan?chainId=1&asset=USDC&protocols=compound"             > /tmp/scan.json
+
+          node - <<'NODE'
+          const fs = require("fs");
+          const body = JSON.parse(fs.readFileSync("/tmp/scan.json", "utf8"));
+          if (body.schemaVersion !== "0.4.0") throw new Error("unexpected schema version");
+          if (body.riskModelVersion !== "0.3.1") throw new Error("unexpected risk model version");
+          if (!Array.isArray(body.rows) || body.rows.length !== 1) {
+            throw new Error("expected one Compound scanner row");
+          }
+          const row = body.rows[0];
+          if (row.protocol !== "compound") throw new Error("unexpected protocol");
+          if (row.assetSymbol !== "USDC") throw new Error("unexpected asset");
+          if (typeof row.observedGrossApyPct !== "number") {
+            throw new Error("live APY missing");
+          }
+          if (!["GREEN","WATCH","RED","VERIFY"].includes(row.riskStatus)) {
+            throw new Error("invalid risk status");
+          }
+          console.log(JSON.stringify({
+            protocol: row.protocol,
+            observedGrossApyPct: row.observedGrossApyPct,
+            riskStatus: row.riskStatus,
+            riskScore: row.riskScore,
+            evidenceCoveragePct: row.evidenceCoveragePct,
+            unresolved: row.unresolved
+          }));
+          NODE
+
+      - name: Check OPEN comparison API
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error             --retry 3 --retry-delay 5             --max-time 240             "$BASE_URL/api/v1/compare?chainId=1&asset=USDC&protocols=compound"             > /tmp/compare.json
+
+          node - <<'NODE'
+          const fs = require("fs");
+          const body = JSON.parse(fs.readFileSync("/tmp/compare.json", "utf8"));
+          if (body.access?.product !== "comparison_api") {
+            throw new Error("comparison product marker missing");
+          }
+          if (body.access?.plan !== "FREE") {
+            throw new Error("OPEN validation should expose FREE plan context");
+          }
+          console.log(JSON.stringify(body.access));
+          NODE
