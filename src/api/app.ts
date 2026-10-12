@@ -3,10 +3,18 @@ import { resolveAccess } from "./access.js";
 import { landingPage } from "./landing-page.js";
 import { parseScannerQuery } from "./query.js";
 import { scannerPage } from "./scanner-page.js";
+import {
+  buildConversionEvent,
+  logConversionEvent,
+  safeConfiguredDestination,
+  trackingQuery,
+  type ConversionEvent
+} from "./tracking.js";
 
 export interface ApiApplicationDependencies {
   scanner: Pick<YieldScannerService, "scan">;
   env?: NodeJS.ProcessEnv;
+  eventSink?: (event: ConversionEvent) => void;
 }
 
 function json(
@@ -30,6 +38,20 @@ export function createApiApplication(
   fetch(request: Request): Promise<Response>;
 } {
   const env = dependencies.env ?? process.env;
+  const eventSink = dependencies.eventSink ?? logConversionEvent;
+
+  const emit = (
+    event: ConversionEvent["event"],
+    request: Request,
+    url: URL,
+    overrides: Partial<ConversionEvent> = {}
+  ): void => {
+    try {
+      eventSink(buildConversionEvent(event, request, url, overrides));
+    } catch {
+      // Analytics must never block the product path.
+    }
+  };
 
   return {
     async fetch(request: Request): Promise<Response> {
@@ -55,10 +77,10 @@ export function createApiApplication(
       }
 
       if (url.pathname === "/") {
+        emit("landing_view", request, url);
+
         return new Response(
-          landingPage({
-            contactUrl: env.DVY_CONTACT_URL
-          }),
+          landingPage(),
           {
             status: 200,
             headers: {
@@ -70,7 +92,43 @@ export function createApiApplication(
         );
       }
 
+      if (url.pathname === "/go/scanner") {
+        emit("scanner_click", request, url);
+
+        return Response.redirect(
+          new URL("/scanner" + trackingQuery(url.searchParams), url),
+          302
+        );
+      }
+
+      if (url.pathname === "/go/interest") {
+        const product = url.searchParams.get("product");
+        const isB2b = product === "b2b";
+
+        emit(isB2b ? "b2b_interest" : "pro_interest", request, url, {
+          intent: isB2b ? "b2b_api" : "founding_beta"
+        });
+
+        const configured = safeConfiguredDestination(
+          env.DVY_CONTACT_URL
+        );
+
+        if (configured) {
+          return Response.redirect(new URL(configured, url), 302);
+        }
+
+        const fallback = new URL("/scanner", url);
+        fallback.searchParams.set(
+          "intent",
+          isB2b ? "b2b-api" : "founding-beta"
+        );
+        fallback.searchParams.set("source", "landing");
+        return Response.redirect(fallback, 302);
+      }
+
       if (url.pathname === "/scanner") {
+        emit("scanner_view", request, url);
+
         return new Response(scannerPage(), {
           status: 200,
           headers: {
@@ -101,6 +159,10 @@ export function createApiApplication(
       ) {
         try {
           const query = parseScannerQuery(url.searchParams);
+
+          if (url.searchParams.get("ui") === "1") {
+            emit("scan_run", request, url);
+          }
 
           if (query.includeEvidence && !access.canViewFullEvidence) {
             return json(
