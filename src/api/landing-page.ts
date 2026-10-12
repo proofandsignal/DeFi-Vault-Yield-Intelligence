@@ -1,26 +1,4 @@
-function safeContactUrl(raw: string | undefined): string {
-  const value = raw?.trim();
-  if (!value) {
-    return "/scanner?source=landing&intent=founding-beta";
-  }
-
-  if (
-    value.startsWith("/") ||
-    value.startsWith("https://") ||
-    value.startsWith("http://") ||
-    value.startsWith("mailto:")
-  ) {
-    return value.replace(/"/g, "%22");
-  }
-
-  return "/scanner?source=landing&intent=founding-beta";
-}
-
-export function landingPage(options: {
-  contactUrl?: string;
-} = {}): string {
-  const contactUrl = safeContactUrl(options.contactUrl);
-
+export function landingPage(): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -470,7 +448,7 @@ export function landingPage(options: {
         <a href="#method">Method</a>
         <a href="#coverage">Markets</a>
         <a href="#access">Access</a>
-        <a class="button small" href="/scanner">Open Scanner</a>
+        <a class="button small" href="/go/scanner?source=landing&campaign=nav">Open Scanner</a>
       </div>
     </div>
   </nav>
@@ -485,7 +463,7 @@ export function landingPage(options: {
           yield, liquidity, borrower concentration, risk signals and evidence coverage.
         </p>
         <div class="hero-actions">
-          <a class="button primary" href="/scanner?source=landing">Open Yield Scanner</a>
+          <a class="button primary" href="/go/scanner?source=landing&campaign=hero-primary">Open Yield Scanner</a>
           <a class="button" href="#access">PRO & API Early Access</a>
         </div>
         <div class="trust-row" aria-label="Product safeguards">
@@ -629,7 +607,7 @@ export function landingPage(options: {
               <li>Risk status and score</li>
               <li>Evidence coverage</li>
             </ul>
-            <a class="button" href="/scanner?source=landing&plan=free">Open Scanner</a>
+            <a class="button" href="/go/scanner?source=landing&campaign=free-card">Open Scanner</a>
           </article>
 
           <article class="card product featured">
@@ -642,7 +620,7 @@ export function landingPage(options: {
               <li>Saved watchlists</li>
               <li>Expanded evidence access</li>
             </ul>
-            <a class="button primary" href="${contactUrl}">Join Founding Beta</a>
+            <a class="button primary" href="/go/interest?product=pro&source=landing&campaign=founding-beta">Join Founding Beta</a>
           </article>
 
           <article class="card product">
@@ -655,7 +633,7 @@ export function landingPage(options: {
               <li>Keyed access path ready</li>
               <li>Wallet / treasury / fintech use cases</li>
             </ul>
-            <a class="button" href="${contactUrl}">Request API Access</a>
+            <a class="button" href="/go/interest?product=b2b&source=landing&campaign=b2b-api">Request API Access</a>
           </article>
         </div>
       </div>
@@ -671,7 +649,7 @@ export function landingPage(options: {
             to decide the next build — not feature guesses.
           </p>
         </div>
-        <a class="button primary" href="${contactUrl}">Join the first 10 users</a>
+        <a class="button primary" href="/go/interest?product=pro&source=landing&campaign=first-10">Join the first 10 users</a>
       </div>
     </section>
 

@@ -1,0 +1,71 @@
+name: Landing Production Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/api/landing-page.ts"
+      - "src/api/tracking.ts"
+      - "src/api/app.ts"
+      - "src/api/scanner-page.ts"
+      - ".github/workflows/landing-production-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  landing-production-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE_URL: https://defi-vault-yield-intelligence.onrender.com
+
+    steps:
+      - name: Wait for Render auto-deploy and verify landing
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 24); do
+            code=$(curl --silent --output /tmp/landing.html --write-out "%{http_code}" --max-time 60 "$BASE_URL/" || true)
+            if [ "$code" = "200" ] &&
+               grep -q "Proof & Signal — DeFi Yield Intelligence" /tmp/landing.html &&
+               grep -q "Compare DeFi yield beyond APY" /tmp/landing.html &&
+               grep -q "/go/scanner" /tmp/landing.html &&
+               grep -q "/go/interest?product=pro" /tmp/landing.html; then
+              echo "Landing deployed successfully."
+              break
+            fi
+
+            if [ "$attempt" = "24" ]; then
+              echo "Landing did not become ready."
+              exit 1
+            fi
+
+            sleep 10
+          done
+
+      - name: Verify tracked scanner redirect
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers=$(curl --silent --show-error --head --max-time 60             "$BASE_URL/go/scanner?source=production-smoke&campaign=landing002")
+
+          echo "$headers" | grep -Eiq "^HTTP/.* 302"
+          echo "$headers" | grep -Eiq "^location: .*\/scanner\?source=production-smoke&campaign=landing002"
+
+      - name: Verify scanner and health remain available
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          curl --fail --silent --show-error --max-time 60             "$BASE_URL/scanner?source=production-smoke&campaign=landing002"             > /tmp/scanner.html
+          grep -q "Scan live markets" /tmp/scanner.html
+
+          curl --fail --silent --show-error --max-time 60             "$BASE_URL/health" > /tmp/health.json
+
+          node - <<'NODE'
+          const fs = require("fs");
+          const body = JSON.parse(fs.readFileSync("/tmp/health.json", "utf8"));
+          if (body.status !== "ok") throw new Error("health.status is not ok");
+          if (body.mode !== "READ_ONLY") throw new Error("service is not READ_ONLY");
+          if (body.publicCapital !== "LOCKED") throw new Error("public capital lock missing");
+          NODE

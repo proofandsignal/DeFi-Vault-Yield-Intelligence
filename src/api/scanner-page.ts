@@ -85,10 +85,25 @@ async function scan() {
   body.innerHTML = "";
   status.textContent = "Scanning live markets…";
 
+  const pageParams = new URLSearchParams(window.location.search);
   const params = new URLSearchParams({
     chainId: document.getElementById("chain").value,
-    asset: document.getElementById("asset").value
+    asset: document.getElementById("asset").value,
+    ui: "1"
   });
+
+  for (const key of [
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_content",
+    "source",
+    "campaign",
+    "intent"
+  ]) {
+    const value = pageParams.get(key);
+    if (value) params.set(key, value);
+  }
 
   const principal = document.getElementById("principal").value;
   const costs = document.getElementById("costs").value;
