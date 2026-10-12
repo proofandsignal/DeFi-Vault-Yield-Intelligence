@@ -131,21 +131,98 @@ test("root serves the product landing while scanner remains separate", async () 
   assert.doesNotMatch(scannerHtml, /Join Founding Beta/);
 });
 
-test("landing accepts a configured contact URL without changing scanner access", async () => {
+test("conversion routes preserve attribution and emit anonymous events", async () => {
+  const events: any[] = [];
+  const app = createApiApplication({
+    scanner,
+    eventSink(event) {
+      events.push(event);
+    }
+  });
+
+  const landing = await app.fetch(
+    new Request(
+      "http://localhost/?utm_source=x&utm_medium=social&utm_campaign=prelaunch_problem"
+    )
+  );
+  assert.equal(landing.status, 200);
+  assert.equal(events[0].event, "landing_view");
+  assert.equal(events[0].source, "x");
+  assert.equal(events[0].campaign, "prelaunch_problem");
+
+  const click = await app.fetch(
+    new Request(
+      "http://localhost/go/scanner?source=landing&campaign=hero-primary"
+    )
+  );
+  assert.equal(click.status, 302);
+  assert.match(
+    click.headers.get("location") ?? "",
+    /\/scanner\?source=landing&campaign=hero-primary/
+  );
+  assert.equal(events[1].event, "scanner_click");
+
+  const scannerView = await app.fetch(
+    new Request(
+      "http://localhost/scanner?source=landing&campaign=hero-primary"
+    )
+  );
+  assert.equal(scannerView.status, 200);
+  assert.equal(events[2].event, "scanner_view");
+});
+
+test("PRO and B2B interest routes emit distinct intent events", async () => {
+  const events: any[] = [];
   const app = createApiApplication({
     scanner,
     env: {
       DVY_CONTACT_URL: "https://example.com/founding-beta"
-    } as NodeJS.ProcessEnv
+    } as NodeJS.ProcessEnv,
+    eventSink(event) {
+      events.push(event);
+    }
   });
 
-  const landing = await app.fetch(new Request("http://localhost/"));
-  const html = await landing.text();
-
-  assert.match(html, /https:\/\/example\.com\/founding-beta/);
-
-  const scan = await app.fetch(
-    new Request("http://localhost/api/v1/scan?chainId=1&asset=USDC")
+  const pro = await app.fetch(
+    new Request(
+      "http://localhost/go/interest?product=pro&source=landing&campaign=founding-beta"
+    )
   );
-  assert.equal(scan.status, 200);
+  assert.equal(pro.status, 302);
+  assert.equal(
+    pro.headers.get("location"),
+    "https://example.com/founding-beta"
+  );
+  assert.equal(events[0].event, "pro_interest");
+  assert.equal(events[0].intent, "founding_beta");
+
+  const b2b = await app.fetch(
+    new Request(
+      "http://localhost/go/interest?product=b2b&source=landing&campaign=b2b-api"
+    )
+  );
+  assert.equal(b2b.status, 302);
+  assert.equal(events[1].event, "b2b_interest");
+  assert.equal(events[1].intent, "b2b_api");
+});
+
+test("scanner UI request is counted as scan_run without changing API output", async () => {
+  const events: any[] = [];
+  const app = createApiApplication({
+    scanner,
+    eventSink(event) {
+      events.push(event);
+    }
+  });
+
+  const result = await app.fetch(
+    new Request(
+      "http://localhost/api/v1/scan?chainId=1&asset=USDC&ui=1&source=landing&campaign=hero-primary"
+    )
+  );
+
+  assert.equal(result.status, 200);
+  assert.equal(events[0].event, "scan_run");
+  assert.equal(events[0].source, "landing");
+  assert.equal(events[0].campaign, "hero-primary");
 });
