@@ -1,5 +1,6 @@
 import type { YieldScannerService } from "../scanner/service.js";
 import { resolveAccess } from "./access.js";
+import { landingPage } from "./landing-page.js";
 import { parseScannerQuery } from "./query.js";
 import { scannerPage } from "./scanner-page.js";
 
@@ -53,7 +54,23 @@ export function createApiApplication(
         );
       }
 
-      if (url.pathname === "/" || url.pathname === "/scanner") {
+      if (url.pathname === "/") {
+        return new Response(
+          landingPage({
+            contactUrl: env.DVY_CONTACT_URL
+          }),
+          {
+            status: 200,
+            headers: {
+              "content-type": "text/html; charset=utf-8",
+              "cache-control": "public, max-age=60",
+              ...accessHeaders
+            }
+          }
+        );
+      }
+
+      if (url.pathname === "/scanner") {
         return new Response(scannerPage(), {
           status: 200,
           headers: {

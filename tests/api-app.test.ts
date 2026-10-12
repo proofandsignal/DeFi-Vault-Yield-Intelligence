@@ -107,3 +107,45 @@ test("valid PRO key unlocks comparison API", async () => {
   assert.equal(result.status, 200);
   assert.equal(result.headers.get("x-dvy-plan"), "PRO");
 });
+
+
+test("root serves the product landing while scanner remains separate", async () => {
+  const app = createApiApplication({ scanner });
+
+  const landing = await app.fetch(new Request("http://localhost/"));
+  const landingHtml = await landing.text();
+
+  assert.equal(landing.status, 200);
+  assert.match(landingHtml, /Proof & Signal — DeFi Yield Intelligence/);
+  assert.match(landingHtml, /Compare DeFi yield beyond APY/);
+  assert.match(landingHtml, /Join Founding Beta/);
+  assert.match(landingHtml, /No custody/);
+
+  const scannerPage = await app.fetch(
+    new Request("http://localhost/scanner")
+  );
+  const scannerHtml = await scannerPage.text();
+
+  assert.equal(scannerPage.status, 200);
+  assert.match(scannerHtml, /Scan live markets/);
+  assert.doesNotMatch(scannerHtml, /Join Founding Beta/);
+});
+
+test("landing accepts a configured contact URL without changing scanner access", async () => {
+  const app = createApiApplication({
+    scanner,
+    env: {
+      DVY_CONTACT_URL: "https://example.com/founding-beta"
+    } as NodeJS.ProcessEnv
+  });
+
+  const landing = await app.fetch(new Request("http://localhost/"));
+  const html = await landing.text();
+
+  assert.match(html, /https:\/\/example\.com\/founding-beta/);
+
+  const scan = await app.fetch(
+    new Request("http://localhost/api/v1/scan?chainId=1&asset=USDC")
+  );
+  assert.equal(scan.status, 200);
+});
