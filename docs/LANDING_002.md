@@ -63,19 +63,19 @@ Supported parameters:
 Example X warm-up URL:
 
 ```text
-https://defi-vault-yield-intelligence.onrender.com/?utm_source=x&utm_medium=social&utm_campaign=prelaunch_problem
+https://yield.proofandsignal.xyz/?utm_source=x&utm_medium=social&utm_campaign=prelaunch_problem
 ```
 
 Example X launch URL:
 
 ```text
-https://defi-vault-yield-intelligence.onrender.com/?utm_source=x&utm_medium=social&utm_campaign=launch
+https://yield.proofandsignal.xyz/?utm_source=x&utm_medium=social&utm_campaign=launch
 ```
 
 Example direct prospect URL:
 
 ```text
-https://defi-vault-yield-intelligence.onrender.com/?utm_source=outreach&utm_medium=dm&utm_campaign=validation10&utm_content=prospect01
+https://yield.proofandsignal.xyz/?utm_source=outreach&utm_medium=dm&utm_campaign=validation10&utm_content=prospect01
 ```
 
 ## CTA routing
@@ -113,21 +113,28 @@ The product decision remains:
 
 ## Custom domain
 
-Proposed product hostname:
+Canonical public product hostname:
 
 ```text
-yield.proofandsignal.com
+yield.proofandsignal.xyz
 ```
 
-Do not activate or publish this hostname until ownership/control of the parent domain and its DNS provider are confirmed.
+The product continues to run on the existing Render service `defi-vault-yield-intelligence`.
 
-When domain control is confirmed:
+The Render hostname remains a technical origin/fallback for diagnostics only:
 
-1. Add `yield.proofandsignal.com` as a custom domain to the existing Render service `defi-vault-yield-intelligence`.
-2. Render will provide the required DNS target.
-3. Add the requested DNS record at the domain provider.
-4. Wait for Render to verify the custom domain and issue TLS.
-5. Re-run production health, landing, scanner and API smoke checks.
-6. Change campaign links from the Render hostname to the verified custom domain.
+```text
+https://defi-vault-yield-intelligence.onrender.com
+```
+
+Public campaign, launch and outreach links should use `https://yield.proofandsignal.xyz`.
+
+Production completion gate:
+
+1. Render custom-domain verification passes.
+2. DNS resolves publicly.
+3. TLS/HTTPS is valid for `yield.proofandsignal.xyz`.
+4. Landing, scanner, tracked redirects and health checks pass through the custom domain.
+5. GitHub production smoke validates the custom domain rather than the Render fallback hostname.
 
 No separate hosting service is required.

@@ -16,10 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      BASE_URL: https://defi-vault-yield-intelligence.onrender.com
+      BASE_URL: https://yield.proofandsignal.xyz
 
     steps:
-      - name: Wait for Render auto-deploy and verify landing
+      - name: Wait for Render auto-deploy and verify custom-domain landing
         shell: bash
         run: |
           set -euo pipefail
