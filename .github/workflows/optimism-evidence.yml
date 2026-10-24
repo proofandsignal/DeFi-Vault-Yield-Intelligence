@@ -22,4 +22,4 @@ jobs:
         with:
           node-version: "22"
       - name: Run isolated OP evidence tests
-        run: node --test experimental/optimism/normalize-evidence.test.mjs
+        run: node --test experimental/optimism/*.test.mjs
